@@ -39,7 +39,7 @@ hospital:
     chat-model: ${LLM_CHAT_MODEL:qwen-flash}
     embedding-model: ${LLM_EMBEDDING_MODEL:text-embedding-v3}
     embedding-dim: 1024
-    # ReAct 分诊循环上限（视频：迭代 7/7）
+    # ReAct 分诊循环上限，超过后进入确定性兜底
     max-agent-steps: 7
   rag:
     top-k: 4
