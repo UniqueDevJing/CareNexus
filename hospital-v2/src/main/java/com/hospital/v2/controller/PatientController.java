@@ -102,6 +102,9 @@ public class PatientController {
                             @RequestParam(required = false) Long patientId,
                             @RequestParam String complaint,
                             @AuthenticationPrincipal AuthPrincipal principal) {
+        if (complaint == null || complaint.isBlank() || complaint.length() > 4000) {
+            throw new BizException("主诉不能为空且不能超过 4000 个字符");
+        }
         long ownPatientId = currentUser.patientId(principal, patientId);
         currentUser.assertPatientOwnsSession(principal, sessionId);
         TriageResult r = agent.triage(sessionId, ownPatientId, complaint);

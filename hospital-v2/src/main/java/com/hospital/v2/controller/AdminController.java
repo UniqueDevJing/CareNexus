@@ -375,6 +375,13 @@ public class AdminController {
     @PostMapping(value = "/knowledge/upload", consumes = "multipart/form-data")
     public Result<?> uploadDoc(@RequestParam long baseId, @RequestParam("file") org.springframework.web.multipart.MultipartFile file) throws Exception {
         String name = file.getOriginalFilename() == null ? "doc.txt" : file.getOriginalFilename();
+        String lower = name.toLowerCase(java.util.Locale.ROOT);
+        if (!(lower.endsWith(".txt") || lower.endsWith(".md"))) {
+            throw new BizException("知识库上传仅支持 TXT 或 Markdown 文件");
+        }
+        if (file.getSize() > 10L * 1024 * 1024) {
+            throw new BizException("知识库文件不能超过 10 MB");
+        }
         String text = new String(file.getBytes(), java.nio.charset.StandardCharsets.UTF_8);
         // 去掉 md 标记符号，保留正文
         text = text.replaceAll("(?m)^#{1,6}\\s*", "").replaceAll("\\*+", "").replaceAll("`+", "");

@@ -24,8 +24,11 @@ public class TokenService {
 
     public TokenService(ObjectMapper json,
                         @Value("${hospital.auth.jwt-secret}") String secret,
-                        @Value("${hospital.auth.token-hours:8}") long tokenHours) {
-        if (secret == null || secret.length() < 32) {
+                        @Value("${hospital.auth.token-hours:8}") long tokenHours,
+                        @Value("${spring.profiles.active:}") String activeProfile) {
+        boolean productionProfile = activeProfile != null && activeProfile.toLowerCase(java.util.Locale.ROOT).contains("mysql");
+        boolean placeholder = secret == null || secret.toLowerCase(java.util.Locale.ROOT).matches(".*(change[-_]?me|replace[-_]?with|local[-_]?only|default).*" );
+        if (secret == null || secret.length() < 32 || (productionProfile && placeholder)) {
             throw new IllegalStateException("hospital.auth.jwt-secret 至少需要 32 个字符");
         }
         this.json = json;

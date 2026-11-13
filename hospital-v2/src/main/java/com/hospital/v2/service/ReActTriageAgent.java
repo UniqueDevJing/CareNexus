@@ -63,53 +63,59 @@ public class ReActTriageAgent {
     public TriageResult triage(Long sessionId, Long patientId, String complaint) {
         long t0 = System.currentTimeMillis();
         long runId = newRun(sessionId, patientId);
-        List<ToolSpecification> specs = tools.buildSpecs();
-        List<ChatMessage> msgs = new ArrayList<>();
-        msgs.add(SystemMessage.from(systemPrompt(props.getLlm().getMaxAgentSteps())));
-        msgs.add(UserMessage.from("患者主诉：" + complaint + "。请通过工具核查后给出分诊建议（仅输出 JSON）。"));
-
         int steps = 0;
-        Map<String, Object> finalJson = null;
+        try {
+            List<ToolSpecification> specs = tools.buildSpecs();
+            List<ChatMessage> msgs = new ArrayList<>();
+            msgs.add(SystemMessage.from(systemPrompt(props.getLlm().getMaxAgentSteps())));
+            msgs.add(UserMessage.from("患者主诉：" + complaint + "。请通过工具核查后给出分诊建议（仅输出 JSON）。"));
 
-        // 危急征象硬拦截（代码侧，不依赖模型）
-        Long redDept = checkRedFlag(complaint);
-        if (redDept != null) {
-            Map<String, Object> rf = new LinkedHashMap<>();
-            rf.put("department_id", redDept);
-            rf.put("doctor_id", firstDoctor(redDept));
-            rf.put("confidence", 0.99);
-            rf.put("reason", "命中危急征象规则，已硬拦截转急诊绿色通道。");
-            finalJson = buildVerified(runId, sessionId, patientId, rf, true, t0);
-            return new TriageResult(runId, finalJson, steps + 1);
-        }
+            Map<String, Object> finalJson = null;
 
-        // ReAct 循环
-        while (steps < props.getLlm().getMaxAgentSteps()) {
-            Response<AiMessage> resp = llm.generate(msgs, specs);
-            AiMessage ai = resp.content();
-            steps++;
-            if (ai.hasToolExecutionRequests()) {
-                for (ToolExecutionRequest req : ai.toolExecutionRequests()) {
-                    long stepId = newStep(runId, steps, ai.text(), req.name(), req.arguments());
-                    String result = tools.execute(req.name(), req.arguments(), runId, stepId, "agent");
-                    msgs.add(ai);
-                    msgs.add(ToolExecutionResultMessage.from(req, result));
-                    db.update("UPDATE agent_step SET output_json=:o, cost_ms=:c WHERE id=:id",
-                            Map.of("o", clip(result), "c", 30, "id", stepId));
-                }
-            } else {
-                finalJson = parseFinal(ai.text());
-                if (finalJson != null) break;
+            // 危急征象硬拦截（代码侧，不依赖模型）
+            Long redDept = checkRedFlag(complaint);
+            if (redDept != null) {
+                Map<String, Object> rf = new LinkedHashMap<>();
+                rf.put("department_id", redDept);
+                rf.put("doctor_id", firstDoctor(redDept));
+                rf.put("confidence", 0.99);
+                rf.put("reason", "命中危急征象规则，已硬拦截转急诊绿色通道。");
+                finalJson = buildVerified(runId, sessionId, patientId, rf, true, t0, ++steps);
+                return new TriageResult(runId, finalJson, steps);
             }
+
+            // ReAct 循环
+            while (steps < props.getLlm().getMaxAgentSteps()) {
+                Response<AiMessage> resp = llm.generate(msgs, specs);
+                AiMessage ai = resp.content();
+                steps++;
+                if (ai.hasToolExecutionRequests()) {
+                    for (ToolExecutionRequest req : ai.toolExecutionRequests()) {
+                        long stepId = newStep(runId, steps, ai.text(), req.name(), req.arguments());
+                        String result = tools.execute(req.name(), req.arguments(), runId, stepId, "agent");
+                        msgs.add(ai);
+                        msgs.add(ToolExecutionResultMessage.from(req, result));
+                        db.update("UPDATE agent_step SET output_json=:o, cost_ms=:c WHERE id=:id",
+                                Map.of("o", clip(result), "c", 30, "id", stepId));
+                    }
+                } else {
+                    finalJson = parseFinal(ai.text());
+                    if (finalJson != null) break;
+                }
+            }
+            if (finalJson == null) finalJson = fallback(complaint);
+            Map<String, Object> verified = buildVerified(runId, sessionId, patientId, finalJson, false, t0, steps);
+            return new TriageResult(runId, verified, steps);
+        } catch (RuntimeException e) {
+            db.update("UPDATE agent_run SET status='FAILED', steps=:steps, cost_ms=:cost WHERE id=:id",
+                    Map.of("steps", steps, "cost", (int) (System.currentTimeMillis() - t0), "id", runId));
+            throw e;
         }
-        if (finalJson == null) finalJson = fallback(complaint);
-        Map<String, Object> verified = buildVerified(runId, sessionId, patientId, finalJson, false, t0);
-        return new TriageResult(runId, verified, steps);
     }
 
     // ---------- 二次核验 ----------
     private Map<String, Object> buildVerified(long runId, Long sessionId, Long patientId,
-                                             Map<String, Object> raw, boolean redFlag, long t0) {
+                                              Map<String, Object> raw, boolean redFlag, long t0, int steps) {
         long dept = asLong(raw.get("department_id"), 1L);
         long doc = asLong(raw.get("doctor_id"), firstDoctor(dept));
         double conf = asDouble(raw.get("confidence"), 0.8);
@@ -159,7 +165,7 @@ public class ReActTriageAgent {
         // 更新 run
         db.update("UPDATE agent_run SET status='DONE', final_department_id=:d, final_doctor_id=:doc, "
                         + "red_flag=:rf, steps=:s, cost_ms=:c WHERE id=:id",
-                Map.of("d", dept, "doc", doc, "rf", redFlag ? 1 : 0, "s", suggestion.size(), "c",
+                Map.of("d", dept, "doc", doc, "rf", redFlag ? 1 : 0, "s", steps, "c",
                         (int) (System.currentTimeMillis() - t0), "id", runId));
 
         suggestion.put("suggestion_id", sugId);

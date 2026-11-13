@@ -13,6 +13,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -68,12 +69,19 @@ public class AuthController {
         Map<String, Object> u = new LinkedHashMap<>();
         u.put("username", username); u.put("password", passwords.encode(password));
         u.put("real_name", name); u.put("role", "patient"); u.put("phone", text(body.get("phone")));
-        long uid = db.insert("INSERT INTO user_account(username,password,real_name,role,phone) "
-                + "VALUES(:username,:password,:real_name,:role,:phone)", u);
-        Map<String, Object> patient = new LinkedHashMap<>();
-        patient.put("uid", uid); patient.put("name", name); patient.put("gender", text(body.get("gender")));
-        patient.put("age", number(body.get("age"), 0));
-        db.insert("INSERT INTO patient_profile(user_id,name,gender,age) VALUES(:uid,:name,:gender,:age)", patient);
+        long uid;
+        try {
+            uid = db.insert("INSERT INTO user_account(username,password,real_name,role,phone) "
+                    + "VALUES(:username,:password,:real_name,:role,:phone)", u);
+            Map<String, Object> patient = new LinkedHashMap<>();
+            patient.put("uid", uid); patient.put("name", name); patient.put("gender", text(body.get("gender")));
+            int age = number(body.get("age"), 0);
+            if (age < 0 || age > 130) throw new BizException("年龄需为 0-130 的整数");
+            patient.put("age", age);
+            db.insert("INSERT INTO patient_profile(user_id,name,gender,age) VALUES(:uid,:name,:gender,:age)", patient);
+        } catch (DuplicateKeyException e) {
+            throw new BizException("用户名已存在");
+        }
         AuthPrincipal p = new AuthPrincipal(uid, username, "patient");
         Map<String, Object> out = response(p, name);
         // 注册成功即建立同一 HttpOnly 会话，避免前端只能拿到响应 token 却无法进入受保护页面。

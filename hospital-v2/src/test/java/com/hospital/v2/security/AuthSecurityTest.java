@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SpringBootTest(properties =
         "spring.datasource.url=jdbc:h2:mem:hospital_auth;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE")
@@ -65,6 +66,12 @@ class AuthSecurityTest {
                 .andReturn().getResponse().getHeader("Set-Cookie");
         org.junit.jupiter.api.Assertions.assertNotNull(cookie);
         org.junit.jupiter.api.Assertions.assertTrue(cookie.contains("hospital_session=") && cookie.contains("HttpOnly"));
+    }
+
+    @Test
+    void productionProfileRejectsPlaceholderJwtSecret() {
+        assertThrows(IllegalStateException.class,
+                () -> new TokenService(json, "replace-with-a-long-random-secret", 8, "mysql"));
     }
 
     private String login(String username, String password) throws Exception {

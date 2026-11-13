@@ -3,6 +3,7 @@ package com.hospital.v2.service;
 import com.hospital.v2.common.BizException;
 import com.hospital.v2.dao.Db;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -45,6 +46,7 @@ public class MedicalRecordService {
     }
 
     /** 提交病历：草稿 → SUBMITTED 锁定；同步把对应挂号置为 DONE（完成就诊）。 */
+    @Transactional
     public void submit(long recordId) {
         int aff = db.update("UPDATE medical_record SET status='SUBMITTED' WHERE id=:id AND status='DRAFT'",
                 Map.of("id", recordId));
@@ -54,6 +56,7 @@ public class MedicalRecordService {
     }
 
     /** 完成就诊（不写病历直接结诊）。 */
+    @Transactional
     public void finishVisit(long registrationId) {
         int aff = db.update("UPDATE registration SET status='DONE' WHERE id=:id AND status='PAID'",
                 Map.of("id", registrationId));

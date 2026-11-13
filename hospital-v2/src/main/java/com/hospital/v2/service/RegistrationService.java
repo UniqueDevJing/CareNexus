@@ -4,6 +4,7 @@ import com.hospital.v2.common.BizException;
 import com.hospital.v2.dao.Db;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -21,6 +22,7 @@ public class RegistrationService {
         this.db = db;
     }
 
+    @Transactional
     public Map<String, Object> register(Long suggestionId, Long patientId) {
         Map<String, Object> sug = db.queryOne(
                 "SELECT id, department_id, doctor_id FROM triage_suggestion WHERE id=:id", Map.of("id", suggestionId));
