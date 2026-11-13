@@ -3,7 +3,11 @@
 .vscode
 **/node_modules
 **/target
+!hospital-v2/target
+!hospital-v2/target/hospital-v2.jar
 **/dist
+!hospital-web-v2/dist
+!hospital-web-v2/dist/**
 *.log
 .env
 *.tar.gz
