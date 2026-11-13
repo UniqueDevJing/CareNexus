@@ -49,6 +49,52 @@ public class PatientController {
         return Result.ok(Map.of("sessionId", preTriage.startSession(ownPatientId)));
     }
 
+    /** 恢复患者刷新页面前的会话，避免前端看似“失忆”。 */
+    @GetMapping("/session/history")
+    public Result<?> sessionHistory(@RequestParam long sessionId,
+                                    @AuthenticationPrincipal AuthPrincipal principal) {
+        currentUser.assertPatientOwnsSession(principal, sessionId);
+        Map<String, Object> session = db.queryOne(
+                "SELECT id, patient_id, status, locked, summary FROM pre_triage_session WHERE id=:id",
+                Map.of("id", sessionId));
+        if (session == null) throw new BizException("预问诊会话不存在或已失效");
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("sessionId", sessionId);
+        out.put("status", session.get("status"));
+        out.put("locked", session.get("locked"));
+        out.put("summary", session.get("summary"));
+        out.put("messages", preTriage.history(sessionId));
+
+        // 将最近一次分诊建议和预约结果一并恢复，刷新后仍可继续完成预约。
+        Map<String, Object> suggestion = db.queryOne(
+                "SELECT s.id AS suggestion_id, s.department_id, dep.name AS department_name, "
+                        + "s.doctor_id, doc.name AS doctor_name, s.confidence, s.red_flag, s.reason, "
+                        + "s.registered "
+                        + "FROM triage_suggestion s "
+                        + "JOIN department dep ON dep.id=s.department_id "
+                        + "JOIN doctor doc ON doc.id=s.doctor_id "
+                        + "WHERE s.session_id=:session AND s.patient_id=:patient "
+                        + "ORDER BY s.id DESC LIMIT 1",
+                Map.of("session", sessionId, "patient", session.get("patient_id")));
+        if (suggestion != null) {
+            Map<String, Object> registration = db.queryOne(
+                    "SELECT id AS registration_id, work_date, period FROM registration "
+                            + "WHERE suggestion_id=:suggestion AND patient_id=:patient ORDER BY id DESC LIMIT 1",
+                    Map.of("suggestion", suggestion.get("suggestion_id"), "patient", session.get("patient_id")));
+            Map<String, Object> schedule = db.queryOne(
+                    "SELECT work_date, period FROM doctor_schedule WHERE doctor_id=:doctor AND status=1 "
+                            + "AND remain_num>0 AND work_date>=CURRENT_DATE ORDER BY work_date, period LIMIT 1",
+                    Map.of("doctor", suggestion.get("doctor_id")));
+            Map<String, Object> slot = registration != null ? registration : schedule;
+            suggestion.put("suggested_date", slot == null ? "" : String.valueOf(slot.get("work_date"))
+                    + " " + String.valueOf(slot.get("period")));
+            suggestion.put("can_register", registration != null || schedule != null);
+            out.put("suggestion", suggestion);
+            if (registration != null) out.put("registration", registration);
+        }
+        return Result.ok(out);
+    }
+
     /** 预问诊多轮 SSE 真流式。 */
     @GetMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter chat(@RequestParam long sessionId, @RequestParam(required = false) String msg,

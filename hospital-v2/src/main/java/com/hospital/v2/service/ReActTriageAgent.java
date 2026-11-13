@@ -133,8 +133,15 @@ public class ReActTriageAgent {
         }
         String date = nearestAvailableDate(doc);
         if (date == null) {
-            reason += "（提示：该医生暂无可约号源，建议人工改派）";
-            conf = Math.min(conf, 0.6);
+            long replacement = firstAvailableDoctor(dept);
+            if (replacement > 0) {
+                doc = replacement;
+                date = nearestAvailableDate(doc);
+                reason += "（已为你切换到本科室当前有号源的医生）";
+            } else {
+                reason += "（当前科室暂无可约号源，请稍后重试或联系人工服务）";
+                conf = Math.min(conf, 0.6);
+            }
         }
 
         Map<String, Object> suggestion = new LinkedHashMap<>();
@@ -145,6 +152,7 @@ public class ReActTriageAgent {
         suggestion.put("confidence", conf);
         suggestion.put("red_flag", redFlag ? 1 : 0);
         suggestion.put("reason", reason);
+        suggestion.put("can_register", date != null);
         suggestion.put("suggested_date", date == null ? "" : date);
 
         // 落库：triage_suggestion
@@ -202,6 +210,15 @@ public class ReActTriageAgent {
         Map<String, Object> row = db.queryOne(
                 "SELECT id FROM doctor WHERE department_id=:d ORDER BY id LIMIT 1", Map.of("d", deptId));
         return row == null ? 1L : ((Number) row.get("id")).longValue();
+    }
+
+    private long firstAvailableDoctor(long deptId) {
+        String today = LocalDate.now().toString();
+        Map<String, Object> row = db.queryOne(
+                "SELECT doctor_id FROM doctor_schedule WHERE department_id=:d AND status=1 "
+                        + "AND remain_num>0 AND work_date>=:today ORDER BY work_date, period, doctor_id LIMIT 1",
+                Map.of("d", deptId, "today", today));
+        return row == null ? 0L : ((Number) row.get("doctor_id")).longValue();
     }
 
     private boolean deptEquals(Map<String, Object> docRow, long dept) {

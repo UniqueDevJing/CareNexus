@@ -26,8 +26,8 @@
         </div>
 
         <footer class="composer">
-          <textarea v-model="input" rows="2" :disabled="!sessionId || streaming" placeholder="例如：从昨晚开始持续胸闷，活动后更明显……" @keydown.enter.exact.prevent="send"></textarea>
-          <div><span>{{ streaming ? '正在生成回复…' : 'Enter 发送 · 信息仅用于本次分诊' }}</span><div><button class="secondary-button" :disabled="!sessionId || streaming || suggested" @click="doTriage">生成建议</button><button class="send-button" :disabled="!sessionId || streaming || !input.trim()" @click="send">发送 ↑</button></div></div>
+          <textarea v-model="input" rows="2" :disabled="!sessionId || locked || streaming" placeholder="例如：从昨晚开始持续胸闷，活动后更明显……" @keydown.enter.exact.prevent="send"></textarea>
+          <div><span>{{ locked ? '本次会话已生成建议，可重新开始新的预问诊' : streaming ? '正在生成回复…' : 'Enter 发送 · 对话会保存到本次会话' }}</span><div><button class="secondary-button" :disabled="!sessionId || locked || streaming || suggested" @click="doTriage">生成建议并查看号源</button><button class="send-button" :disabled="!sessionId || locked || streaming || !input.trim()" @click="send">发送 ↑</button></div></div>
         </footer>
       </article>
 
@@ -37,7 +37,8 @@
           <div v-if="sug.red_flag" class="urgent-notice">检测到危急征象，已切换急诊绿色通道</div>
           <span class="result-label">推荐就诊</span><h3>{{ sug.department_name }}</h3><p>{{ sug.doctor_name }} · {{ sug.suggested_date }}</p>
           <div class="result-reason"><b>为什么这样推荐</b><p>{{ sug.reason }}</p></div>
-          <button class="primary-button primary-button--wide" :disabled="registered" @click="doRegister">{{ registered ? '预约已完成' : '确认并预约挂号' }}</button>
+          <button class="primary-button primary-button--wide" :disabled="registered || sug.can_register === false" @click="doRegister">{{ registered ? '预约已完成' : sug.can_register === false ? '当前暂无可约号源' : '确认并预约挂号' }}</button>
+          <small v-if="sug.can_register === false" class="booking-proof booking-proof--warning">建议重新开始分诊或联系人工服务</small>
           <small v-if="registered" class="booking-proof">预约凭证 · {{ reg.work_date }} {{ reg.period }}</small>
         </article>
 
@@ -70,6 +71,7 @@ const sessionId = ref(null)
 const msgs = ref([])
 const input = ref('')
 const streaming = ref(false)
+const locked = ref(false)
 const suggested = ref(false)
 const sug = ref({})
 const registered = ref(false)
@@ -92,14 +94,32 @@ async function saveProfile() {
     ElMessage.success('档案已保存')
   } finally { saving.value = false }
 }
-onMounted(loadProfile)
+async function restoreSession() {
+  const saved = localStorage.getItem('carenexus_pretriage_session')
+  if (!saved) return
+  try {
+    const data = await api.get('/patient/session/history', { sessionId: Number(saved) })
+    sessionId.value = data.sessionId
+    locked.value = Number(data.locked) === 1 || data.status === 'LOCKED'
+    msgs.value = (data.messages || []).map(m => ({ role: m.role === 'assistant' ? 'bot' : 'user', text: m.content }))
+    if (data.suggestion) {
+      sug.value = data.suggestion
+      suggested.value = true
+      registered.value = Number(data.suggestion.registered) === 1 || !!data.registration
+      if (data.registration) reg.value = data.registration
+    }
+    scroll()
+  } catch { localStorage.removeItem('carenexus_pretriage_session') }
+}
+onMounted(async () => { await loadProfile(); await restoreSession() })
 
 function scroll() { nextTick(() => { if (box.value) box.value.scrollTop = box.value.scrollHeight }) }
 async function start() {
   const r = await api.post('/patient/session')
   sessionId.value = r.sessionId
+  localStorage.setItem('carenexus_pretriage_session', String(r.sessionId))
   msgs.value = []
-  suggested.value = false; registered.value = false; sug.value = {}
+  locked.value = false; suggested.value = false; registered.value = false; sug.value = {}
   ElMessage.success('会话已建立')
 }
 async function send() {
@@ -138,18 +158,23 @@ async function send() {
       }
     }
     assistant.typing = false
-  } catch (e) { assistant.text += '（连接中断）'; assistant.typing = false }
+  } catch (e) { assistant.text = '（连接中断，请检查网络后重试）'; assistant.typing = false; ElMessage.error('助手连接失败，请稍后重试') }
   streaming.value = false
 }
 async function doTriage() {
   const complaint = input.value.trim() || msgs.value.filter(m=>m.role==='user').map(m=>m.text).join('，')
   if (!complaint) { ElMessage.warning('请先描述症状'); return }
-  sug.value = await api.post('/patient/triage', { sessionId: sessionId.value, complaint })
-  suggested.value = true
+  try {
+    sug.value = await api.post('/patient/triage', { sessionId: sessionId.value, complaint })
+    suggested.value = true
+    locked.value = true
+  } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '暂时无法生成预约建议，请稍后重试') }
 }
 async function doRegister() {
-  reg.value = await api.post('/patient/register', { suggestionId: sug.value.suggestion_id })
-  registered.value = true
-  ElMessage.success('挂号成功')
+  try {
+    reg.value = await api.post('/patient/register', { suggestionId: sug.value.suggestion_id })
+    registered.value = true
+    ElMessage.success(`预约成功：${reg.value.work_date} ${reg.value.period}`)
+  } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '预约失败，号源可能刚刚被占用') }
 }
 </script>

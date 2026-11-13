@@ -22,6 +22,7 @@ import dev.langchain4j.model.output.TokenUsage;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -86,11 +87,17 @@ public class LlmGateway {
 
     /** 无工具的普通对话（预问诊追问用）。真实模式失败则降级返回 null，由调用方走本地脚本。 */
     public String chatText(String system, String user) {
+        return chatText(system, List.of(UserMessage.from(user)));
+    }
+
+    /** 普通对话的带上下文入口；调用方负责传入已按时间排序的历史消息。 */
+    public String chatText(String system, List<ChatMessage> conversation) {
         refreshModelFromDatabase();
         if (!isReal()) return null;
         try {
+            List<ChatMessage> messages = withSystem(system, conversation);
             ChatRequest req = ChatRequest.builder()
-                    .messages(List.of(SystemMessage.from(system), UserMessage.from(user))).build();
+                    .messages(messages).build();
             ChatResponse resp = model.chat(req);
             return resp.aiMessage().text();
         } catch (Exception e) {
@@ -105,6 +112,14 @@ public class LlmGateway {
                               java.util.function.Consumer<String> onToken,
                               java.util.function.Consumer<String> onComplete,
                               java.util.function.Consumer<Throwable> onError) {
+        return streamText(system, List.of(UserMessage.from(user)), onToken, onComplete, onError);
+    }
+
+    /** 流式对话的带上下文入口，确保模型看到同一会话的完整消息链。 */
+    public boolean streamText(String system, List<ChatMessage> conversation,
+                              java.util.function.Consumer<String> onToken,
+                              java.util.function.Consumer<String> onComplete,
+                              java.util.function.Consumer<Throwable> onError) {
         refreshModelFromDatabase();
         if (!isReal()) return false;
         long t0 = System.currentTimeMillis();
@@ -112,8 +127,7 @@ public class LlmGateway {
         OpenAiStreamingChatModel streaming = OpenAiStreamingChatModel.builder()
                 .baseUrl(activeBaseUrl).apiKey(props.getLlm().getApiKey())
                 .modelName(activeModelName).temperature(0.3).build();
-        ChatRequest request = ChatRequest.builder()
-                .messages(List.of(SystemMessage.from(system), UserMessage.from(user))).build();
+        ChatRequest request = ChatRequest.builder().messages(withSystem(system, conversation)).build();
         streaming.chat(request, new StreamingChatResponseHandler() {
             @Override public void onPartialResponse(String partial) {
                 if (partial != null) { full.append(partial); onToken.accept(partial); }
@@ -131,6 +145,13 @@ public class LlmGateway {
             }
         });
         return true;
+    }
+
+    private List<ChatMessage> withSystem(String system, List<ChatMessage> conversation) {
+        List<ChatMessage> messages = new ArrayList<>();
+        messages.add(SystemMessage.from(system));
+        if (conversation != null) messages.addAll(conversation);
+        return messages;
     }
 
     /** 管理端启用的 CHAT 配置是运行时权威来源；修改后下一次调用即生效。密钥只取环境配置。 */

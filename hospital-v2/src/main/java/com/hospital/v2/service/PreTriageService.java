@@ -2,6 +2,9 @@ package com.hospital.v2.service;
 
 import com.hospital.v2.config.LlmGateway;
 import com.hospital.v2.dao.Db;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.UserMessage;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -56,7 +59,7 @@ public class PreTriageService {
                                java.util.function.Consumer<String> onComplete,
                                java.util.function.Consumer<Throwable> onError) {
         if (isLocked(sessionId)) return false;
-        return llm.streamText(PRE_SYS, "患者说：" + userText, onToken, text -> {
+        return llm.streamText(promptFor(sessionId), conversation(sessionId, userText), onToken, text -> {
             appendAssistant(sessionId, text);
             onComplete.accept(text);
         }, onError);
@@ -70,7 +73,7 @@ public class PreTriageService {
                 Map.of("s", sessionId)).get("c")).intValue();
 
         String reply;
-        String real = llm.chatText(PRE_SYS, "患者说：" + userText);
+        String real = llm.chatText(promptFor(sessionId), conversation(sessionId, userText));
         if (real != null && !real.isBlank()) {
             reply = real;
         } else {
@@ -98,5 +101,42 @@ public class PreTriageService {
     public List<Map<String, Object>> history(long sessionId) {
         return db.query("SELECT role, content, create_time FROM pre_triage_message WHERE session_id=:s ORDER BY id",
                 Map.of("s", sessionId));
+    }
+
+    /** 让模型看到同一会话的全部上下文，而不是只看到最后一句。 */
+    private List<ChatMessage> conversation(long sessionId, String currentText) {
+        List<ChatMessage> messages = new java.util.ArrayList<>();
+        List<Map<String, Object>> rows = history(sessionId);
+        for (Map<String, Object> row : rows) {
+            String content = String.valueOf(row.getOrDefault("content", ""));
+            if ("assistant".equalsIgnoreCase(String.valueOf(row.get("role")))) {
+                messages.add(AiMessage.from(content));
+            } else {
+                messages.add(UserMessage.from(content));
+            }
+        }
+        // 兼容未来不经过 appendUser 的调用方，避免模型收到空上下文。
+        if (messages.isEmpty() && currentText != null && !currentText.isBlank()) {
+            messages.add(UserMessage.from("患者说：" + currentText));
+        }
+        return messages;
+    }
+
+    private String promptFor(long sessionId) {
+        Map<String, Object> session = db.queryOne(
+                "SELECT patient_id FROM pre_triage_session WHERE id=:id", Map.of("id", sessionId));
+        StringBuilder prompt = new StringBuilder(PRE_SYS)
+                .append("\n你必须结合本次会话中的历史消息继续追问，不能重复已经回答过的问题。")
+                .append("如果患者表达了预约/挂号意图，先完成必要的症状与安全确认，再明确告知患者点击‘生成建议’查看可预约号源；不要声称已经替患者预约。\n");
+        if (session != null && session.get("patient_id") != null) {
+            Map<String, Object> profile = db.queryOne(
+                    "SELECT name, gender, age, allergic_history, past_history FROM patient_profile WHERE id=:id",
+                    Map.of("id", session.get("patient_id")));
+            if (profile != null) {
+                prompt.append("患者健康档案（仅用于本次安全判断）：")
+                        .append(profile).append("\n");
+            }
+        }
+        return prompt.toString();
     }
 }
