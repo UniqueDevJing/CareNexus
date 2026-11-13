@@ -13,7 +13,7 @@ import java.util.Map;
 
 /**
  * 智能预问诊：多轮 SSE 追问（简练、口语化），会话记忆落库；
- * 分诊后会话被锁定，不能再追问（与视频一致）。
+ * 分诊后会话被锁定，不能再追问，避免建议与上下文发生漂移。
  */
 @Service
 public class PreTriageService {

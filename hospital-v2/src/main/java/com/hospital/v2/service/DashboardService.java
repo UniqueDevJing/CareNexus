@@ -8,7 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** 就诊运营看板：三组数字从业务表现场聚合，不建统计表（与视频一致）。 */
+/** 就诊运营看板：三组数字从业务表现场聚合，不建冗余统计表。 */
 @Service
 public class DashboardService {
     private final Db db;

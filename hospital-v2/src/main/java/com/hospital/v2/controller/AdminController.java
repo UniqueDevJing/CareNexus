@@ -137,7 +137,7 @@ public class AdminController {
             + "CASE WHEN api_key IS NULL OR api_key='' THEN 0 ELSE 1 END has_api_key,create_time "
             + "FROM ai_model_config ORDER BY sort", Map.of())); }
 
-    // ==================== 以下为课程对齐补全：管理 CRUD / 顺延 / AI 配置 / 工具注册 / 上传 / 看板增强 ====================
+    // ==================== 产品运营能力：管理 CRUD / 顺延 / AI 配置 / 工具注册 / 上传 / 看板增强 ====================
 
     // ---- 通用 CRUD：科室 / 医生 / 排班 / 患者 / 症状标签 / 危急规则 ----
     @PostMapping("/departments/save")
