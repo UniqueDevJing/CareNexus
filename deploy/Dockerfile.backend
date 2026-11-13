@@ -1,0 +1,8 @@
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+COPY hospital-v2/target/hospital-v2.jar app.jar
+RUN addgroup -S carenexus && adduser -S carenexus -G carenexus
+USER carenexus
+ENV JAVA_OPTS="-Xms128m -Xmx512m -XX:+UseG1GC"
+EXPOSE 18092
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar --spring.profiles.active=mysql"]

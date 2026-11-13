@@ -1,0 +1,9 @@
+.git
+.idea
+.vscode
+**/node_modules
+**/target
+**/dist
+*.log
+.env
+*.tar.gz

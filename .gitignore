@@ -1,0 +1,30 @@
+# Java / Maven
+**/target/
+*.class
+*.jar
+*.log
+
+# Node / Vite
+**/node_modules/
+**/dist/
+*.local
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Secrets and local runtime files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Local test and deployment artifacts
+.work/
+.workbuddy/
+*.tar.gz
+hospital-v2/test-output.txt

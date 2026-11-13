@@ -1,0 +1,4 @@
+FROM nginx:1.27-alpine
+COPY hospital-web-v2/dist /usr/share/nginx/html/CareNexus
+COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
