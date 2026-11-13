@@ -340,3 +340,18 @@ body { background: var(--clinical-ground); color: var(--clinical-ink); font-size
 }
 
 .booking-proof--warning { color: var(--clinical-warning); }
+
+/* Portfolio polish: a consistent clinical product surface across patient,
+   doctor and operations views. */
+.app-shell .route-stage { animation: route-arrive .42s var(--ease-out, cubic-bezier(.22,1,.36,1)); }
+.app-shell .surface, .app-shell .card { transition: transform .22s cubic-bezier(.22,1,.36,1), box-shadow .22s ease, border-color .22s ease; }
+.app-shell .surface:hover, .app-shell .card:hover { transform: translateY(-2px); box-shadow: 0 28px 70px -42px rgba(18,47,49,.56); }
+.app-shell .nav-item { letter-spacing: .01em; }
+.app-shell .topbar-session { padding-left: 12px; }
+.app-shell .session-state { padding: 7px 10px; border: 1px solid rgba(39,110,102,.12); border-radius: 999px; background: rgba(255,255,255,.46); }
+.app-shell .primary-button, .app-shell .secondary-button { transition: transform .18s ease, box-shadow .18s ease, background-color .18s ease; }
+.app-shell .primary-button:hover, .app-shell .secondary-button:hover { transform: translateY(-1px); }
+@keyframes route-arrive { from { opacity: .72; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .route-stage, .app-shell .surface, .app-shell .card { animation: none; transition: none; }
+}
