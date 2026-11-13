@@ -30,7 +30,8 @@ services:
       MYSQL_USER: ${MYSQL_USER:-carenexus}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
-      AUTH_COOKIE_SECURE: "true"
+      # Must be set explicitly: use false for the bundled HTTP demo, true only behind HTTPS.
+      AUTH_COOKIE_SECURE: "${AUTH_COOKIE_SECURE:?Set AUTH_COOKIE_SECURE explicitly}"
       LLM_MODE: ${LLM_MODE:-real}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
       LLM_API_KEY: ${LLM_API_KEY}

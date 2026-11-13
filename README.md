@@ -73,7 +73,7 @@ npm run dev
 
 ## 部署
 
-生产部署配置位于 [`deploy/`](deploy/)，静态入口为 `/CareNexus/`，API 前缀为 `/v2/api`。生产环境必须通过环境变量配置数据库密码、JWT Secret 和模型密钥，禁止提交 `.env`。
+生产部署配置位于 [`deploy/`](deploy/)，静态入口为 `/CareNexus/`，API 前缀为 `/v2/api`。示例 Compose 入口仅监听 HTTP：本地或演示环境使用 `AUTH_COOKIE_SECURE=false`；生产环境必须先由网关终止 TLS，再设置 `AUTH_COOKIE_SECURE=true`。生产环境必须通过环境变量配置数据库密码、JWT Secret 和模型密钥，禁止提交 `.env`。
 
 ## 质量检查
 
