@@ -27,6 +27,7 @@ services:
       mysql:
         condition: service_healthy
     environment:
+      MYSQL_HOST: ${MYSQL_HOST:-mysql}
       MYSQL_USER: ${MYSQL_USER:-carenexus}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
