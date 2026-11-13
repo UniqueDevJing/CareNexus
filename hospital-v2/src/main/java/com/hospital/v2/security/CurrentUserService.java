@@ -17,6 +17,22 @@ public class CurrentUserService {
         if ("admin".equals(p.role()) && requested != null) return requested;
         requireRole(p, "patient");
         Map<String, Object> row = db.queryOne("SELECT id FROM patient_profile WHERE user_id=:u", Map.of("u", p.userId()));
+        if (row == null) {
+            // 兼容早期生产数据：旧患者档案可能只有姓名，没有回填 user_id。
+            // 仅允许“同名且唯一、仍未绑定”的档案自动绑定，避免扩大数据访问范围。
+            Map<String, Object> account = db.queryOne(
+                    "SELECT real_name FROM user_account WHERE id=:u AND role='patient'", Map.of("u", p.userId()));
+            String realName = account == null ? null : String.valueOf(account.get("real_name"));
+            var candidates = realName == null || realName.isBlank()
+                    ? java.util.List.<Map<String, Object>>of()
+                    : db.query("SELECT id FROM patient_profile WHERE name=:name AND user_id IS NULL",
+                    Map.of("name", realName));
+            if (candidates.size() == 1) {
+                row = candidates.get(0);
+                db.update("UPDATE patient_profile SET user_id=:u WHERE id=:id AND user_id IS NULL",
+                        Map.of("u", p.userId(), "id", row.get("id")));
+            }
+        }
         if (row == null) throw new BizException("当前账号未绑定患者档案");
         long own = ((Number) row.get("id")).longValue();
         if (requested != null && requested != own) throw new BizException("禁止访问其他患者数据");
