@@ -8,7 +8,7 @@
         <span class="brand-mark" aria-hidden="true"><i></i></span>
         <div>
           <b>CareNexus</b>
-          <small>AI triage workspace</small>
+          <small>就诊服务工作台</small>
         </div>
       </div>
 
@@ -19,13 +19,13 @@
       <template v-if="role==='admin'">
         <div class="nav-section">基础数据管理</div>
         <router-link v-for="r in adminGroups.base" :key="r.path" :to="r.path" class="nav-item" :class="{ active: $route.path === r.path }" @click="navOpen = false"><span>{{ r.title }}</span><span class="tag">{{ r.tag }}</span></router-link>
-        <div class="nav-section">AI能力配置</div>
+        <div class="nav-section">模型与策略</div>
         <router-link v-for="r in adminGroups.ai" :key="r.path" :to="r.path" class="nav-item" :class="{ active: $route.path === r.path }" @click="navOpen = false"><span>{{ r.title }}</span><span class="tag">{{ r.tag }}</span></router-link>
-        <div class="nav-section">医学知识库（RAG）</div>
+        <div class="nav-section">医学知识库</div>
         <router-link v-for="r in adminGroups.rag" :key="r.path" :to="r.path" class="nav-item" :class="{ active: $route.path === r.path }" @click="navOpen = false"><span>{{ r.title }}</span><span class="tag">{{ r.tag }}</span></router-link>
-        <div class="nav-section">Agent工具中心</div>
+        <div class="nav-section">外部工具与审计</div>
         <router-link v-for="r in adminGroups.agent" :key="r.path" :to="r.path" class="nav-item" :class="{ active: $route.path === r.path }" @click="navOpen = false"><span>{{ r.title }}</span><span class="tag">{{ r.tag }}</span></router-link>
-        <div class="nav-section">统计与观测</div>
+        <div class="nav-section">运营与审计</div>
         <router-link v-for="r in adminGroups.ops" :key="r.path" :to="r.path" class="nav-item" :class="{ active: $route.path === r.path }" @click="navOpen = false"><span>{{ r.title }}</span><span class="tag">{{ r.tag }}</span></router-link>
       </template>
 
@@ -86,10 +86,10 @@ const doctorRoutes = routes.filter(r => r.meta && r.meta.group === 'doctor')
 const patientRoutes = routes.filter(r => r.meta && r.meta.group === 'patient')
 const adminGroups = {
   base: [{ path: '/admin/basedata', title: '基础数据总览', tag: 'CRUD' }, { path: '/admin/symptoms', title: '症状标签库', tag: 'RULE' }],
-  ai: [{ path: '/admin/aiconfig', title: 'AI模型配置', tag: 'LLM' }, { path: '/admin/prompts', title: 'Prompt模板', tag: 'PROMPT' }],
+  ai: [{ path: '/admin/aiconfig', title: '模型与策略', tag: 'MODEL' }, { path: '/admin/prompts', title: '提示模板', tag: 'TEXT' }],
   rag: [{ path: '/admin/knowledge', title: '医学知识库', tag: 'RAG' }, { path: '/admin/knowledge/docs', title: '知识文档', tag: 'DOC' }, { path: '/admin/knowledge/chunks', title: '知识片段', tag: 'CHUNK' }, { path: '/admin/knowledge/search', title: '向量化与检索', tag: 'TOPK' }],
   agent: [{ path: '/admin/tools', title: '工具注册表', tag: 'MCP' }, { path: '/admin/tools/logs', title: '工具调用日志', tag: 'LOG' }],
-  ops: [{ path: '/admin/dashboard', title: '就诊运营看板', tag: 'KPI' }, { path: '/admin/agent-runs', title: 'Agent执行时间线', tag: 'TRACE' }, { path: '/admin/usage', title: 'AI调用观测', tag: 'TOKEN' }]
+  ops: [{ path: '/admin/dashboard', title: '就诊运营看板', tag: 'KPI' }, { path: '/admin/agent-runs', title: '外部执行记录', tag: 'TRACE' }, { path: '/admin/usage', title: '系统调用观测', tag: 'USAGE' }]
 }
 
 const route = useRoute()
@@ -103,7 +103,7 @@ const user = computed(() => {
 })
 const role = computed(() => user.value.role)
 const roleLabel = computed(() => ({ admin: '运营管理', doctor: '医生接诊', patient: '患者服务' }[role.value] || '工作台'))
-const sessionLabel = computed(() => ({ admin: 'Agent 链路在线', doctor: '临床会话安全', patient: '隐私连接已保护' }[role.value] || '安全会话'))
+const sessionLabel = computed(() => ({ admin: '运营数据已同步', doctor: '临床会话安全', patient: '隐私连接已保护' }[role.value] || '安全会话'))
 const userInitial = computed(() => (user.value.name || user.value.username || 'U').slice(0, 1).toUpperCase())
 const currentTitle = computed(() => (route.meta && route.meta.title) || '智慧医院')
 let motion

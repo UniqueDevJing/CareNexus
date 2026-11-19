@@ -200,6 +200,9 @@ tbody tr { transition: background-color .16s ease; } tbody tr:hover { background
 .demo-accounts code { padding: 3px 6px; color: var(--vital-ink); background: rgba(255,255,255,.55); border: 1px solid rgba(23,53,54,.12); border-radius: 5px; }
 .demo-accounts small { margin-left: auto; }
 .security-note { margin: 0 auto; color: rgba(219,239,233,.68); font-size: 11px; text-align: center; }
+.login-contest-entry { margin-top: 10px !important; }
+.login-contest-entry a { display: inline-block; padding: 8px 14px; color: #ffd9a8; border: 1px solid rgba(255,217,168,.4); border-radius: 99px; font-size: 12px; font-weight: 600; text-decoration: none; transition: background-color .18s ease, transform .18s ease; }
+.login-contest-entry a:hover { background: rgba(255,217,168,.12); transform: translateY(-1px); }
 
 @media (max-width: 1100px) {
   .login-copy h1 { font-size: clamp(46px,7vw,68px); }
@@ -354,4 +357,123 @@ body { background: var(--clinical-ground); color: var(--clinical-ink); font-size
 @keyframes route-arrive { from { opacity: .72; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
   .app-shell .route-stage, .app-shell .surface, .app-shell .card { animation: none; transition: none; }
+}
+
+/* 2026 product refresh — a quiet clinical service desk, not an AI dashboard. */
+:root {
+  --clinical-ground: #f2f0eb;
+  --clinical-surface: #fffdfa;
+  --clinical-surface-soft: #f7f5f0;
+  --clinical-navy: #1f3738;
+  --clinical-navy-raised: #2c5652;
+  --clinical-action: #bd6549;
+  --clinical-action-strong: #98503b;
+  --clinical-action-soft: #f3e1d8;
+  --clinical-ink: #243637;
+  --clinical-ink-soft: #6d7a76;
+  --clinical-critical: #b44f55;
+  --clinical-warning: #a66c22;
+  --vital-bg: var(--clinical-ground);
+  --vital-panel: var(--clinical-surface);
+  --vital-panel-soft: var(--clinical-surface-soft);
+  --vital-ink: var(--clinical-ink);
+  --vital-ink-soft: var(--clinical-ink-soft);
+  --vital-navy: var(--clinical-navy);
+  --vital-navy-2: var(--clinical-navy-raised);
+  --vital-teal: #8ab4a7;
+  --vital-teal-d: #356f68;
+  --vital-mint: #e3eee8;
+  --vital-red: var(--clinical-critical);
+  --vital-amber: var(--clinical-warning);
+  --vital-line: rgba(36, 54, 55, .14);
+  --vital-line-dark: rgba(231, 241, 234, .2);
+  --shadow-soft: 0 14px 38px -28px rgba(31, 55, 56, .38);
+}
+
+body { background: var(--clinical-ground); color: var(--clinical-ink); font-family: Inter, "Noto Sans SC", "Microsoft YaHei", sans-serif; }
+.app-shell { background: var(--clinical-ground); }
+.sidebar { background: var(--clinical-navy); box-shadow: none; border-right: 1px solid rgba(255,255,255,.08); }
+.brand-mark { background: var(--clinical-action); border: 0; border-radius: 10px; box-shadow: none; transform: none; }
+.brand-mark::before, .brand-mark::after, .brand-mark i::before, .brand-mark i::after { background: #fff9ef; }
+.brand b { letter-spacing: -.04em; }
+.brand small { color: #b6cbc2; letter-spacing: .02em; text-transform: none; }
+.nav-context { background: #294947; border-color: rgba(255,255,255,.1); }
+.nav-context span, .nav-section { color: #a6c0b7; letter-spacing: .04em; text-transform: none; }
+.nav-item { border-radius: 8px; }
+.nav-item:hover { background: rgba(255,255,255,.07); transform: none; }
+.nav-item.active { color: #fffaf4; background: rgba(189,101,73,.18); border-color: rgba(255,255,255,.08); box-shadow: none; }
+.nav-item.active::before { width: 3px; height: 20px; background: #e4a286; }
+.nav-item .tag, .nav-item.active .tag { color: #afc6bc; }
+.sidebar-foot { border-top-color: rgba(255,255,255,.1); }
+.sidebar-foot span { color: #9cb6ad; }
+.logout-button { color: #f3d3c7; }
+.main { background: var(--clinical-ground); }
+.topbar { background: rgba(242,240,235,.94); border-bottom-color: var(--clinical-line); backdrop-filter: none; }
+.page-kicker, .eyebrow { color: var(--clinical-action-strong); letter-spacing: .07em; }
+.page-head h1 { color: var(--clinical-ink); }
+.session-state { color: var(--clinical-ink-soft); border-color: var(--clinical-line) !important; background: var(--clinical-surface) !important; }
+.user-avatar { background: var(--clinical-navy); }
+.surface, .card, .metric-tile { border-color: var(--clinical-line); box-shadow: var(--shadow-soft); border-radius: 14px; }
+.surface:hover, .card:hover { transform: translateY(-1px); box-shadow: 0 18px 44px -30px rgba(31,55,56,.45); }
+.workspace-hero, .workspace-hero--dark { background: var(--clinical-navy); box-shadow: none; border: 0; border-radius: 18px; }
+.workspace-hero--dark::after, .workspace-hero::after, .workspace-hero::before { display: none; }
+.workspace-hero h2 { color: #fffaf4; letter-spacing: -.055em; }
+.workspace-hero p { color: #c4d5cc; }
+.workspace-hero--dark .eyebrow { color: #e2a58c; }
+.system-pulse { background: #294947; border-color: rgba(255,255,255,.1); }
+.system-pulse small { color: #b7cec4; }
+.metric-tile { background: var(--clinical-surface); }
+.metric-tile strong { color: var(--clinical-ink); }
+.metric-tile--alert { background: #fff6f1; border-color: rgba(189,101,73,.32); }
+.metric-tile--alert strong { color: var(--clinical-action-strong); }
+.pipeline-map { background: var(--clinical-surface-soft); border-color: var(--clinical-line); }
+.pipeline-node > span { color: var(--clinical-action-strong); background: var(--clinical-action-soft); }
+.pipeline-node--active > span { background: var(--clinical-action); box-shadow: 0 0 0 5px rgba(189,101,73,.14); }
+.run-row:hover, .run-row.active { background: #f7e9e1; }
+.progress-track { background: #e3e7df; }
+.progress-track i { background: var(--clinical-action); }
+.doctor-capacity { background: var(--clinical-surface-soft); }
+.doctor-avatar { background: var(--clinical-navy-raised); }
+.primary-button, .secondary-button, .send-button { border-radius: 9px; min-height: 44px; }
+.primary-button { background: var(--clinical-action); border-color: var(--clinical-action); color: #fffaf4; box-shadow: none; }
+.primary-button:hover { background: var(--clinical-action-strong); }
+.secondary-button { background: var(--clinical-surface); border-color: var(--clinical-line); color: var(--clinical-ink); }
+.secondary-button:hover { border-color: var(--clinical-action); color: var(--clinical-action-strong); }
+.text-button { color: var(--clinical-action-strong); }
+.consultation-shell, .clinical-grid { gap: 18px; }
+.conversation-panel, .clinical-canvas, .patient-queue { border-radius: 16px; border-color: var(--clinical-line); box-shadow: var(--shadow-soft); }
+.conversation-head, .patient-hero { border-bottom-color: var(--clinical-line); }
+.conversation-stream, .clinical-canvas { background: var(--clinical-surface); }
+.message-row.bot .message-content { background: var(--clinical-surface-soft); border-color: var(--clinical-line); }
+.message-row.user .message-content { background: var(--clinical-navy); color: #fffaf4; }
+.message-row.user .message-content small, .message-row.user .message-content p { color: #edf5ef; }
+.message-avatar, .agent-symbol { background: var(--clinical-action-soft); color: var(--clinical-action-strong); }
+.composer { background: var(--clinical-surface-soft); border-top-color: var(--clinical-line); }
+.composer textarea { background: var(--clinical-surface); border-color: var(--clinical-line); }
+.result-ticket { background: var(--clinical-surface); border-color: rgba(189,101,73,.3); box-shadow: var(--shadow-soft); }
+.safety-card { background: var(--clinical-navy); border-color: transparent; box-shadow: none; }
+.profile-card { background: var(--clinical-surface); border-color: var(--clinical-line); }
+.record-form input, .record-form textarea, .profile-form input, .profile-form textarea { border-color: var(--clinical-line); background: var(--clinical-surface-soft); }
+.clinical-alerts { background: #f7e9e1; border-color: rgba(189,101,73,.2); }
+.login-page { background: var(--clinical-ground); }
+.login-bg-grid, .login-orbit { display: none; }
+.login-stage { width: min(1080px, calc(100% - 80px)); grid-template-columns: minmax(0, 1.08fr) minmax(380px, .92fr); gap: 68px; }
+.login-intro { align-self: center; }
+.login-brand { color: var(--clinical-ink); }
+.login-brand .brand-mark { background: var(--clinical-action); }
+.login-kicker { color: var(--clinical-action-strong); letter-spacing: .07em; }
+.login-intro h1 { color: var(--clinical-ink); font-size: clamp(48px, 6vw, 82px); letter-spacing: -.07em; }
+.login-intro > p:not(.login-kicker):not(.login-contest-entry) { color: var(--clinical-ink-soft); max-width: 540px; }
+.login-contest-entry a { color: var(--clinical-action-strong); }
+.login-panel { min-height: 0; padding: 0; background: transparent; }
+.login-card { background: var(--clinical-surface); border: 1px solid var(--clinical-line); border-radius: 16px; box-shadow: 0 24px 70px -42px rgba(31,55,56,.65); }
+.login-card-head .status-dot { background: #6f9d88; box-shadow: 0 0 0 5px rgba(111,157,136,.14); }
+.login-card .el-tabs__item.is-active, .login-card .el-tabs__active-bar { color: var(--clinical-action-strong); }
+.login-submit { background: var(--clinical-action) !important; border-color: var(--clinical-action) !important; }
+.security-note { color: var(--clinical-ink-soft); }
+.app-shell .route-stage { animation: route-arrive .34s ease-out; }
+@media (max-width: 720px) {
+  .login-stage { width: min(100% - 32px, 540px); display: block; padding: 36px 0 28px; }
+  .login-intro { margin-bottom: 30px; }
+  .login-intro h1 { font-size: clamp(42px, 13vw, 62px); }
 }

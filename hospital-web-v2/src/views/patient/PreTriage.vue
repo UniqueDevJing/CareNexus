@@ -1,7 +1,7 @@
 <template>
   <section class="workspace patient-journey" aria-label="智能预问诊工作区">
     <section class="journey-head">
-      <div><span class="eyebrow">GUIDED PRE-TRIAGE</span><h2>先说说哪里不舒服。</h2><p>CareNexus 会进行必要追问，并结合你的健康档案给出安全、可解释的就诊建议。</p></div>
+      <div><span class="eyebrow">预问诊</span><h2>先说说哪里不舒服。</h2><p>我们会补充必要信息，再给出就诊方向。建议不会替代医生诊断。</p></div>
       <div class="journey-steps">
         <span class="done"><i>1</i>健康档案</span><b></b><span :class="{ active: sessionId }"><i>2</i>症状沟通</span><b></b><span :class="{ active: suggested }"><i>3</i>就诊建议</span>
       </div>
@@ -10,7 +10,7 @@
     <section class="consultation-shell">
       <article class="conversation-panel">
         <header class="conversation-head">
-            <div class="agent-identity"><span class="agent-symbol">C</span><div><b>CareNexus 预问诊助手</b><small><i></i>{{ sessionId ? `会话 #${sessionId} 已连接` : '等待开始会话' }}</small></div></div>
+            <div class="agent-identity"><span class="agent-symbol">C</span><div><b>CareNexus 预问诊</b><small><i></i>{{ sessionId ? `会话 #${sessionId} 已建立` : '等待开始会话' }}</small></div></div>
           <button class="secondary-button" @click="start">{{ sessionId ? '重新开始' : '开始预问诊' }}</button>
         </header>
 
@@ -21,7 +21,7 @@
           </div>
           <div v-for="(m, i) in msgs" :key="i" :class="['message-row', m.role]">
             <span v-if="m.role === 'bot'" class="message-avatar">T</span>
-            <div class="message-content"><small>{{ m.role === 'bot' ? 'CareNexus' : '你' }}</small><p>{{ m.text }}<i v-if="m.typing" class="typing-caret"></i></p></div>
+            <div class="message-content"><small>{{ m.role === 'bot' ? '预问诊记录' : '你' }}</small><p>{{ m.text }}<i v-if="m.typing" class="typing-caret"></i></p></div>
           </div>
         </div>
 

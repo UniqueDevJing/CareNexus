@@ -2,9 +2,9 @@
   <section class="workspace command-center" aria-label="运营看板工作区">
     <section class="workspace-hero workspace-hero--dark">
       <div>
-        <span class="eyebrow">CARENEXUS / LIVE OPERATIONS</span>
-        <h2>让每一次分诊决策<br>都清晰、可追踪。</h2>
-        <p>从患者意图识别到号源落位，统一观察 Agent 推理、工具调用与临床安全拦截。</p>
+        <span class="eyebrow">CARENEXUS / 就诊运营</span>
+        <h2>把每一次转接<br>留在记录里。</h2>
+        <p>从患者描述到医生接诊，统一查看风险拦截、人工确认和号源使用情况。</p>
       </div>
       <div class="system-pulse">
         <span class="pulse-orbit"><i></i></span>
@@ -35,7 +35,7 @@
 
     <section class="dashboard-grid">
       <article class="surface pipeline-panel">
-        <header class="panel-head"><div><span class="eyebrow">AGENT PIPELINE</span><h3>实时决策链</h3></div><span class="live-badge"><i></i> LIVE</span></header>
+        <header class="panel-head"><div><span class="eyebrow">就诊流程</span><h3>实时决策链</h3></div><span class="live-badge"><i></i> 实时</span></header>
         <div class="pipeline-map">
           <div class="pipeline-node"><span>01</span><b>症状理解</b><small>提取主诉与风险</small></div><i></i>
           <div class="pipeline-node"><span>02</span><b>安全校验</b><small>红旗征象硬拦截</small></div><i></i>

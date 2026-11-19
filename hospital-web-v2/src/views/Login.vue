@@ -9,16 +9,17 @@
           <span class="brand-mark" aria-hidden="true"><i></i></span>
           <span>CareNexus</span>
         </div>
-        <p class="login-kicker">三种身份，一套就诊链路</p>
-        <h1 id="login-title">AI 智慧医院工作台</h1>
-        <p>患者预问诊、医生接诊与运营观测，共用一条安全、可追踪的就诊链路。</p>
+        <p class="login-kicker">患者 · 医生 · 运营</p>
+        <h1 id="login-title">就诊服务工作台</h1>
+        <p>患者先把情况说清楚，医生在完整背景里接诊，运营人员看见每一次转接和确认。</p>
+        <p class="login-contest-entry"><router-link to="/contest">查看 SafePath 产品演示 →</router-link></p>
       </div>
 
       <section class="login-panel" data-enter aria-label="身份认证">
         <div class="login-card">
           <div class="login-card-head">
             <span class="status-dot"></span>
-            <div><h2>{{ mode === 'login' ? '进入工作台' : '创建患者账号' }}</h2><p>身份和数据权限由角色自动隔离</p></div>
+            <div><h2>{{ mode === 'login' ? '进入工作台' : '创建患者账号' }}</h2><p>不同身份看到各自需要的就诊信息</p></div>
           </div>
           <el-tabs v-model="mode" stretch>
             <el-tab-pane label="登录" name="login" />
