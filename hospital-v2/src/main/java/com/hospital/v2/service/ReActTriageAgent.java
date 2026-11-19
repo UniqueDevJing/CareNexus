@@ -71,6 +71,7 @@ public class ReActTriageAgent {
             msgs.add(UserMessage.from("患者主诉：" + complaint + "。请通过工具核查后给出分诊建议（仅输出 JSON）。"));
 
             Map<String, Object> finalJson = null;
+            boolean degraded = false;
 
             // 危急征象硬拦截（代码侧，不依赖模型）
             Long redDept = checkRedFlag(complaint);
@@ -87,6 +88,7 @@ public class ReActTriageAgent {
             // ReAct 循环
             while (steps < props.getLlm().getMaxAgentSteps()) {
                 Response<AiMessage> resp = llm.generate(msgs, specs);
+                degraded = degraded || "true".equals(String.valueOf(resp.metadata().get("degraded")));
                 AiMessage ai = resp.content();
                 steps++;
                 if (ai.hasToolExecutionRequests()) {
@@ -104,6 +106,11 @@ public class ReActTriageAgent {
                 }
             }
             if (finalJson == null) finalJson = fallback(complaint);
+            if (degraded) {
+                finalJson.put("needs_confirmation", true);
+                finalJson.put("reason", String.valueOf(finalJson.getOrDefault("reason", ""))
+                        + "（模型服务异常，结果仅供人工复核，暂不支持自动预约）");
+            }
             Map<String, Object> verified = buildVerified(runId, sessionId, patientId, finalJson, false, t0, steps);
             return new TriageResult(runId, verified, steps);
         } catch (RuntimeException e) {
@@ -152,7 +159,9 @@ public class ReActTriageAgent {
         suggestion.put("confidence", conf);
         suggestion.put("red_flag", redFlag ? 1 : 0);
         suggestion.put("reason", reason);
-        suggestion.put("can_register", date != null);
+        boolean needsConfirmation = redFlag || Boolean.TRUE.equals(raw.get("needs_confirmation"));
+        suggestion.put("needs_confirmation", needsConfirmation);
+        suggestion.put("can_register", !needsConfirmation && date != null);
         suggestion.put("suggested_date", date == null ? "" : date);
 
         // 落库：triage_suggestion
@@ -165,7 +174,7 @@ public class ReActTriageAgent {
         ins.put("confidence", conf);
         ins.put("red_flag", redFlag ? 1 : 0);
         ins.put("reason", reason);
-        ins.put("status", "CONFIRMED");
+        ins.put("status", needsConfirmation ? "PENDING" : "CONFIRMED");
         long sugId = db.insert("INSERT INTO triage_suggestion (run_id, session_id, patient_id, department_id, doctor_id, "
                 + "confidence, red_flag, reason, status) VALUES "
                 + "(:run_id,:session_id,:patient_id,:department_id,:doctor_id,:confidence,:red_flag,:reason,:status)", ins);
@@ -244,6 +253,7 @@ public class ReActTriageAgent {
         m.put("doctor_id", doc);
         m.put("confidence", 0.7);
         m.put("reason", "循环上限内未收敛，已按症状关键词兜底分诊。");
+        m.put("needs_confirmation", true);
         return m;
     }
 

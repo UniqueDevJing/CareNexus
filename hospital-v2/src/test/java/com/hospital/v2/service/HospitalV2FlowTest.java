@@ -1,11 +1,15 @@
 package com.hospital.v2.service;
 
 import com.hospital.v2.common.BizException;
+import com.hospital.v2.dao.Db;
 import com.hospital.v2.domain.TriageResult;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -20,6 +24,18 @@ class HospitalV2FlowTest {
     private ReActTriageAgent agent;
     @Autowired
     private RegistrationService registration;
+    @Autowired
+    private Db db;
+
+    @BeforeEach
+    void keepFixtureSchedulesInTheFuture() {
+        List<Map<String, Object>> schedules = db.query(
+                "SELECT id FROM doctor_schedule WHERE doctor_id=6 ORDER BY id", Map.of());
+        for (int i = 0; i < schedules.size(); i++) {
+            db.update("UPDATE doctor_schedule SET work_date=:date WHERE id=:id",
+                    Map.of("date", LocalDate.now().plusDays(7L + i), "id", schedules.get(i).get("id")));
+        }
+    }
 
     @Test
     void normal_triage_returns_valid_department() {

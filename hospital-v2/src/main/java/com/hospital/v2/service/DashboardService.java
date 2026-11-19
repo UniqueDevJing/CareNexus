@@ -21,7 +21,7 @@ public class DashboardService {
         String today = LocalDate.now().toString();
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("todayRegistration", count("SELECT COUNT(*) c FROM registration WHERE work_date=:t", today));
-        m.put("pendingTriage", count("SELECT COUNT(*) c FROM triage_suggestion WHERE status='CONFIRMED' AND registered=0", null));
+        m.put("pendingTriage", count("SELECT COUNT(*) c FROM triage_suggestion WHERE status='PENDING' AND registered=0", null));
         m.put("totalSuggestion", count("SELECT COUNT(*) c FROM triage_suggestion", null));
         m.put("redFlag", count("SELECT COUNT(*) c FROM triage_suggestion WHERE red_flag=1", null));
         m.put("doctorOnline", count("SELECT COUNT(*) c FROM doctor d WHERE EXISTS "
@@ -62,6 +62,14 @@ public class DashboardService {
         p.put("r", runId);
         return db.query("SELECT id, tool_code, source, status, cost_ms, create_time FROM mcp_tool_call_log "
                 + "WHERE run_id=:r ORDER BY id", p);
+    }
+
+    public List<Map<String, Object>> manualReview() {
+        return db.query("SELECT s.id suggestion_id, s.session_id, s.patient_id, p.name patient_name, "
+                + "dep.name department_name, doc.name doctor_name, s.confidence, s.red_flag, s.reason, s.create_time "
+                + "FROM triage_suggestion s LEFT JOIN patient_profile p ON p.id=s.patient_id "
+                + "LEFT JOIN department dep ON dep.id=s.department_id LEFT JOIN doctor doc ON doc.id=s.doctor_id "
+                + "WHERE s.status='PENDING' AND s.registered=0 ORDER BY s.id DESC LIMIT 50", Map.of());
     }
 
     private long count(String sql, String date) {

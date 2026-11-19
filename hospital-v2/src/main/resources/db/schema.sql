@@ -222,7 +222,7 @@ CREATE TABLE triage_suggestion (
     confidence      DECIMAL(5,4) NOT NULL DEFAULT 0,
     red_flag        TINYINT      NOT NULL DEFAULT 0,
     reason          VARCHAR(512),
-    status          VARCHAR(16) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING|CONFIRMED',
+    status          VARCHAR(16) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING|CONFIRMED|REJECTED|REGISTERED',
     registered      TINYINT     NOT NULL DEFAULT 0 COMMENT '是否被拿去挂号（命中率统计用）',
     create_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),

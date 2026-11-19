@@ -19,6 +19,20 @@
       <article class="metric-tile" :class="{ 'metric-tile--alert': ov.redFlag }"><span>安全硬拦截</span><strong>{{ ov.redFlag || 0 }}</strong><small>{{ ov.pendingTriage || 0 }} 个会话待分诊</small></article>
     </section>
 
+    <section class="surface review-panel" v-if="manualReviews.length">
+      <header class="panel-head"><div><span class="eyebrow">HUMAN REVIEW QUEUE</span><h3>待人工导诊</h3></div><span class="panel-note">低证据、异常或需人工确认的分诊</span></header>
+      <div class="run-feed">
+        <article v-for="item in manualReviews" :key="item.suggestion_id" class="run-row">
+          <span class="run-state" :class="item.red_flag ? 'fail' : 'ok'"></span>
+          <code>#{{ item.suggestion_id }}</code>
+          <span>{{ item.patient_name || '患者' }} · {{ item.department_name || '待分诊' }}</span>
+          <span>{{ item.reason }}</span>
+          <button class="text-button" @click="resolveReview(item, 'REJECT')">转人工处理</button>
+          <button v-if="!item.red_flag" class="text-button" @click="resolveReview(item, 'CONFIRM')">确认建议</button>
+        </article>
+      </div>
+    </section>
+
     <section class="dashboard-grid">
       <article class="surface pipeline-panel">
         <header class="panel-head"><div><span class="eyebrow">AGENT PIPELINE</span><h3>实时决策链</h3></div><span class="live-badge"><i></i> LIVE</span></header>
@@ -90,6 +104,7 @@ const ov = ref({})
 const byDept = ref([])
 const runs = ref([])
 const enh = ref({})
+const manualReviews = ref([])
 const selected = ref(null)
 const timeline = ref([])
 const toolLogs = ref([])
@@ -101,6 +116,17 @@ async function load() {
   byDept.value = await api.get('/admin/dashboard/by-department')
   runs.value = await api.get('/admin/dashboard/runs')
   enh.value = await api.get('/admin/dashboard/enhanced')
+  manualReviews.value = await api.get('/admin/dashboard/manual-review')
+}
+async function resolveReview(item, action) {
+  const note = window.prompt(action === 'CONFIRM' ? '请输入人工确认依据' : '请输入转人工原因', '')
+  if (note === null) return
+  await api.post('/admin/triage/manual-review', null, {
+    suggestionId: item.suggestion_id,
+    action,
+    note
+  })
+  await load()
 }
 async function selectRun(runId) {
   selected.value = runId

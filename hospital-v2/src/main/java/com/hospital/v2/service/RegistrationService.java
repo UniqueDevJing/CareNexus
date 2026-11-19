@@ -25,8 +25,11 @@ public class RegistrationService {
     @Transactional
     public Map<String, Object> register(Long suggestionId, Long patientId) {
         Map<String, Object> sug = db.queryOne(
-                "SELECT id, department_id, doctor_id FROM triage_suggestion WHERE id=:id", Map.of("id", suggestionId));
+                "SELECT id, department_id, doctor_id, status FROM triage_suggestion WHERE id=:id", Map.of("id", suggestionId));
         if (sug == null) throw new BizException("分诊建议不存在");
+        if (!"CONFIRMED".equals(String.valueOf(sug.get("status")))) {
+            throw new BizException("分诊建议尚未确认，暂不能预约，请重新分诊或联系人工服务");
+        }
         long dept = ((Number) sug.get("department_id")).longValue();
         long doc = ((Number) sug.get("doctor_id")).longValue();
 

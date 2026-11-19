@@ -68,7 +68,7 @@ public class PatientController {
         // 将最近一次分诊建议和预约结果一并恢复，刷新后仍可继续完成预约。
         Map<String, Object> suggestion = db.queryOne(
                 "SELECT s.id AS suggestion_id, s.department_id, dep.name AS department_name, "
-                        + "s.doctor_id, doc.name AS doctor_name, s.confidence, s.red_flag, s.reason, "
+                        + "s.doctor_id, doc.name AS doctor_name, s.confidence, s.red_flag, s.reason, s.status, "
                         + "s.registered "
                         + "FROM triage_suggestion s "
                         + "JOIN department dep ON dep.id=s.department_id "
@@ -88,7 +88,11 @@ public class PatientController {
             Map<String, Object> slot = registration != null ? registration : schedule;
             suggestion.put("suggested_date", slot == null ? "" : String.valueOf(slot.get("work_date"))
                     + " " + String.valueOf(slot.get("period")));
-            suggestion.put("can_register", registration != null || schedule != null);
+            boolean confirmed = "CONFIRMED".equals(String.valueOf(suggestion.get("status")))
+                    || registration != null;
+            suggestion.put("needs_confirmation", !confirmed);
+            suggestion.put("can_register", registration != null || (confirmed && schedule != null));
+            suggestion.put("manual_review", "PENDING".equals(String.valueOf(suggestion.get("status"))));
             out.put("suggestion", suggestion);
             if (registration != null) out.put("registration", registration);
         }
@@ -154,7 +158,12 @@ public class PatientController {
         long ownPatientId = currentUser.patientId(principal, patientId);
         currentUser.assertPatientOwnsSession(principal, sessionId);
         TriageResult r = agent.triage(sessionId, ownPatientId, complaint);
-        preTriage.lock(sessionId, "分诊完成，建议科室(id=" + r.suggestion().get("department_id") + ")");
+        boolean needsReview = Boolean.TRUE.equals(r.suggestion().get("needs_confirmation"));
+        boolean redFlag = Integer.valueOf(String.valueOf(r.suggestion().getOrDefault("red_flag", 0))) == 1;
+        if (!needsReview || redFlag) {
+            preTriage.lock(sessionId, redFlag ? "命中风险规则，已转人工/急诊处理" :
+                    "分诊完成，建议科室(id=" + r.suggestion().get("department_id") + ")");
+        }
         return Result.ok(r.suggestion());
     }
 

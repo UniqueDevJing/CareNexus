@@ -7,7 +7,9 @@ import com.hospital.v2.service.DashboardService;
 import com.hospital.v2.service.KnowledgeService;
 import com.hospital.v2.service.ToolCenter;
 import com.hospital.v2.service.UsageService;
+import com.hospital.v2.security.AuthPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.SecureRandom;
@@ -95,6 +97,65 @@ public class AdminController {
 
     @GetMapping("/dashboard/tool-logs")
     public Result<?> toolLogs(@RequestParam long runId) { return Result.ok(dashboard.toolLogs(runId)); }
+
+    @GetMapping("/dashboard/manual-review")
+    public Result<?> manualReview() { return Result.ok(dashboard.manualReview()); }
+
+    /** 人工导诊最小闭环：确认可预约或退回人工处理，生产环境应单独授予导诊/护士角色。 */
+    @PostMapping("/triage/manual-review")
+    public Result<?> resolveManualReview(@RequestBody Map<String, Object> body,
+                                         @AuthenticationPrincipal AuthPrincipal principal) {
+        long suggestionId = Long.parseLong(String.valueOf(body.get("suggestionId")));
+        String action = String.valueOf(body.getOrDefault("action", "")).toUpperCase(java.util.Locale.ROOT);
+        Map<String, Object> suggestion = db.queryOne(
+                "SELECT id, session_id, department_id, doctor_id, red_flag, status, reason FROM triage_suggestion WHERE id=:id",
+                Map.of("id", suggestionId));
+        if (suggestion == null) throw new BizException("分诊建议不存在");
+        if (!"PENDING".equals(String.valueOf(suggestion.get("status")))) {
+            throw new BizException("该分诊建议已处理，无需重复操作");
+        }
+        String note = String.valueOf(body.getOrDefault("note", "人工导诊处理"));
+        if (note.length() > 220) note = note.substring(0, 220);
+        String oldReason = String.valueOf(suggestion.getOrDefault("reason", ""));
+        String reason = (oldReason + "（" + note + "）");
+        if (reason.length() > 500) reason = reason.substring(0, 500);
+        if ("CONFIRM".equals(action)) {
+            if (Integer.valueOf(String.valueOf(suggestion.getOrDefault("red_flag", 0))) == 1) {
+                throw new BizException("命中风险规则的患者不能直接确认普通预约，请转急诊或人工医生处理");
+            }
+            long dept = body.get("departmentId") == null
+                    ? ((Number) suggestion.get("department_id")).longValue()
+                    : Long.parseLong(String.valueOf(body.get("departmentId")));
+            long doctor = body.get("doctorId") == null
+                    ? ((Number) suggestion.get("doctor_id")).longValue()
+                    : Long.parseLong(String.valueOf(body.get("doctorId")));
+            Map<String, Object> doctorRow = db.queryOne(
+                    "SELECT id FROM doctor WHERE id=:doctor AND department_id=:dept",
+                    Map.of("doctor", doctor, "dept", dept));
+            if (doctorRow == null) throw new BizException("医生不属于所选科室");
+            Map<String, Object> slot = db.queryOne(
+                    "SELECT id FROM doctor_schedule WHERE doctor_id=:doctor AND status=1 AND remain_num>0 "
+                            + "AND work_date>=CURRENT_DATE ORDER BY work_date, period LIMIT 1",
+                    Map.of("doctor", doctor));
+            if (slot == null) throw new BizException("当前医生暂无可用号源，请改派医生或联系人工服务");
+            db.update("UPDATE triage_suggestion SET department_id=:dept, doctor_id=:doctor, status='CONFIRMED', reason=:reason WHERE id=:id",
+                    Map.of("dept", dept, "doctor", doctor, "reason", reason, "id", suggestionId));
+            if (suggestion.get("session_id") != null) {
+                db.update("UPDATE pre_triage_session SET locked=1, status='LOCKED', summary=:summary WHERE id=:id",
+                        Map.of("summary", "人工导诊已确认，可继续预约", "id", suggestion.get("session_id")));
+            }
+        } else if ("REJECT".equals(action)) {
+            db.update("UPDATE triage_suggestion SET status='REJECTED', reason=:reason WHERE id=:id",
+                    Map.of("reason", reason, "id", suggestionId));
+        } else {
+            throw new BizException("只支持 CONFIRM 或 REJECT");
+        }
+        db.insert("INSERT INTO operation_audit (operator, action, target, detail) VALUES (:operator,:action,:target,:detail)",
+                Map.of("operator", principal == null ? "admin" : principal.username(),
+                        "action", "MANUAL_TRIAGE_" + action, "target", "triage_suggestion:" + suggestionId,
+                        "detail", reason));
+        return Result.ok(Map.of("suggestionId", suggestionId, "status", "CONFIRM".equals(action) ? "CONFIRMED" : "REJECTED"));
+    }
 
     @GetMapping("/usage")
     public Result<?> usage() {

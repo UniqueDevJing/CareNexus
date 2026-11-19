@@ -1,0 +1,147 @@
+name: CareNexus production deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: carenexus-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Test and package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Backend tests and package
+        working-directory: hospital-v2
+        run: mvn -B -ntp test package
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: hospital-web-v2/package-lock.json
+
+      - name: Frontend build
+        working-directory: hospital-web-v2
+        run: npm ci && npm run build
+
+      - name: Assemble release
+        run: |
+          set -euo pipefail
+          mkdir -p release/web
+          cp hospital-v2/target/hospital-v2.jar release/hospital-v2.jar
+          cp -a hospital-web-v2/dist/. release/web/
+          test -s release/hospital-v2.jar
+          test -s release/web/index.html
+          tar -czf carenexus-release.tgz -C release .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: carenexus-release-${{ github.sha }}
+          path: carenexus-release.tgz
+          if-no-files-found: error
+          retention-days: 14
+
+  deploy:
+    name: Deploy to production server
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: carenexus-release-${{ github.sha }}
+
+      - name: Configure SSH
+        shell: bash
+        env:
+          PROD_KNOWN_HOSTS: ${{ secrets.PROD_KNOWN_HOSTS }}
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+
+      - name: Upload release
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          PROD_PORT: ${{ secrets.PROD_PORT }}
+          PROD_USER: ${{ secrets.PROD_USER }}
+          SHA: ${{ github.sha }}
+        run: scp -P "${PROD_PORT:-22}" carenexus-release.tgz "${PROD_USER}@${PROD_HOST}:/tmp/carenexus-${SHA}.tgz"
+
+      - name: Activate release and verify
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          PROD_PORT: ${{ secrets.PROD_PORT }}
+          PROD_USER: ${{ secrets.PROD_USER }}
+          PROD_APP_DIR: ${{ secrets.PROD_APP_DIR }}
+          SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -p "${PROD_PORT:-22}" "${PROD_USER}@${PROD_HOST}" \
+            "APP_DIR='${PROD_APP_DIR:-/opt/hospital-v2}' RELEASE='${SHA}' bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+
+          release_dir="$APP_DIR/releases/$RELEASE"
+          backup_dir="$APP_DIR/backups/$RELEASE"
+          archive="/tmp/carenexus-$RELEASE.tgz"
+          mkdir -p "$release_dir" "$backup_dir"
+          tar -xzf "$archive" -C "$release_dir"
+          test -s "$release_dir/hospital-v2.jar"
+          test -s "$release_dir/web/index.html"
+
+          backup_target() {
+            local target="$1"
+            if [ -e "$target" ] || [ -L "$target" ]; then
+              mv "$target" "$backup_dir/$(basename "$target")"
+            fi
+          }
+
+          backup_target "$APP_DIR/hospital-v2.jar"
+          backup_target "$APP_DIR/carenexus-web"
+          mv "$release_dir/hospital-v2.jar" "$APP_DIR/hospital-v2.jar"
+          mv "$release_dir/web" "$APP_DIR/carenexus-web"
+
+          rollback() {
+            set +e
+            systemctl stop hospital-v2.service
+            [ -e "$APP_DIR/hospital-v2.jar" ] && mv "$APP_DIR/hospital-v2.jar" "$release_dir/failed.jar"
+            [ -e "$APP_DIR/carenexus-web" ] && mv "$APP_DIR/carenexus-web" "$release_dir/failed-web"
+            [ -e "$backup_dir/hospital-v2.jar" ] && mv "$backup_dir/hospital-v2.jar" "$APP_DIR/hospital-v2.jar"
+            [ -e "$backup_dir/carenexus-web" ] && mv "$backup_dir/carenexus-web" "$APP_DIR/carenexus-web"
+            systemctl start hospital-v2.service
+            exit 1
+          }
+          trap rollback ERR
+
+          systemctl restart hospital-v2.service
+          for i in $(seq 1 30); do
+            systemctl is-active --quiet hospital-v2.service && \
+              curl --fail --silent --show-error --max-time 5 http://127.0.0.1:18092/v2/api/health && break
+            sleep 2
+          done
+          systemctl is-active --quiet hospital-v2.service
+          curl --fail --silent --show-error --max-time 10 http://127.0.0.1:18092/v2/api/health
+          nginx -t
+          systemctl reload nginx
+          rm -f "$archive"
+          trap - ERR
+          REMOTE

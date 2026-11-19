@@ -30,15 +30,27 @@ public class MedicalRecordService {
     public long saveDraft(Map<String, Object> body) {
         Long id = body.get("id") == null ? null : Long.valueOf(String.valueOf(body.get("id")));
         Map<String, Object> m = new LinkedHashMap<>(body);
+        long registrationId = requiredId(body, "registration_id");
+        long patientId = requiredId(body, "patient_id");
+        long doctorId = requiredId(body, "doctor_id");
+        Map<String, Object> registration = db.queryOne(
+                "SELECT id FROM registration WHERE id=:registration AND patient_id=:patient AND doctor_id=:doctor",
+                Map.of("registration", registrationId, "patient", patientId, "doctor", doctorId));
+        if (registration == null) throw new BizException("病历必须绑定当前医生负责的患者和挂号");
         if (id == null) {
             return db.insert("INSERT INTO medical_record (registration_id, patient_id, doctor_id, chief_complaint, "
                     + "present_illness, past_history, allergy_history, assistant_exam, diagnosis, treatment, status) "
                     + "VALUES (:registration_id,:patient_id,:doctor_id,:chief_complaint,:present_illness,:past_history,"
                     + ":allergy_history,:assistant_exam,:diagnosis,:treatment,'DRAFT')", m);
         }
-        Map<String, Object> row = db.queryOne("SELECT status FROM medical_record WHERE id=:id", Map.of("id", id));
+        Map<String, Object> row = db.queryOne("SELECT status, registration_id, patient_id, doctor_id FROM medical_record WHERE id=:id", Map.of("id", id));
         if (row == null) throw new BizException("病历不存在");
         if ("SUBMITTED".equals(row.get("status"))) throw new BizException("病历已提交锁定，不可修改");
+        if (!String.valueOf(row.get("registration_id")).equals(String.valueOf(registrationId))
+                || !String.valueOf(row.get("patient_id")).equals(String.valueOf(patientId))
+                || !String.valueOf(row.get("doctor_id")).equals(String.valueOf(doctorId))) {
+            throw new BizException("病历归属与挂号不一致");
+        }
         db.update("UPDATE medical_record SET chief_complaint=:chief_complaint, present_illness=:present_illness, "
                 + "past_history=:past_history, allergy_history=:allergy_history, assistant_exam=:assistant_exam, "
                 + "diagnosis=:diagnosis, treatment=:treatment WHERE id=:id", m);
@@ -47,12 +59,18 @@ public class MedicalRecordService {
 
     /** 提交病历：草稿 → SUBMITTED 锁定；同步把对应挂号置为 DONE（完成就诊）。 */
     @Transactional
-    public void submit(long recordId) {
-        int aff = db.update("UPDATE medical_record SET status='SUBMITTED' WHERE id=:id AND status='DRAFT'",
-                Map.of("id", recordId));
-        if (aff == 0) throw new BizException("病历不存在或已提交");
-        db.update("UPDATE registration SET status='DONE' WHERE id = "
-                + "(SELECT registration_id FROM medical_record WHERE id=:id)", Map.of("id", recordId));
+    public void submit(long recordId, long registrationId) {
+        int aff = db.update("UPDATE medical_record SET status='SUBMITTED' WHERE id=:id AND registration_id=:registration AND status='DRAFT'",
+                Map.of("id", recordId, "registration", registrationId));
+        if (aff == 0) throw new BizException("病历不存在、挂号不匹配或已提交");
+        db.update("UPDATE registration SET status='DONE' WHERE id=:registration", Map.of("registration", registrationId));
+    }
+
+    private long requiredId(Map<String, Object> body, String key) {
+        Object value = body.get(key);
+        if (value == null || String.valueOf(value).isBlank()) throw new BizException("缺少病历关联字段：" + key);
+        try { return Long.parseLong(String.valueOf(value)); }
+        catch (NumberFormatException e) { throw new BizException("病历关联字段格式错误：" + key); }
     }
 
     /** 完成就诊（不写病历直接结诊）。 */

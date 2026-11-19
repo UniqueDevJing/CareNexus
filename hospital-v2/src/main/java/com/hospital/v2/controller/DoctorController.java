@@ -33,6 +33,9 @@ public class DoctorController {
     public Result<?> saveDraft(@RequestBody Map<String, Object> body,
                                @AuthenticationPrincipal AuthPrincipal principal) {
         Map<String, Object> safe = new java.util.LinkedHashMap<>(body);
+        if (body.get("id") != null) {
+            currentUser.assertDoctorOwnsRecord(principal, Long.parseLong(String.valueOf(body.get("id"))));
+        }
         safe.put("doctor_id", currentUser.doctorId(principal,
                 body.get("doctor_id") instanceof Number n ? n.longValue() : null));
         return Result.ok(Map.of("recordId", records.saveDraft(safe)));
@@ -44,7 +47,7 @@ public class DoctorController {
                             @AuthenticationPrincipal AuthPrincipal principal) {
         currentUser.assertDoctorOwnsRecord(principal, recordId);
         currentUser.assertDoctorOwnsRegistration(principal, registrationId);
-        records.submit(recordId);
+        records.submit(recordId, registrationId);
         return Result.ok();
     }
 

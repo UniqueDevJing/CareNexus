@@ -27,7 +27,7 @@
 
         <footer class="composer">
           <textarea v-model="input" rows="2" :disabled="!sessionId || locked || streaming" placeholder="例如：从昨晚开始持续胸闷，活动后更明显……" @keydown.enter.exact.prevent="send"></textarea>
-          <div><span>{{ locked ? '本次会话已生成建议，可重新开始新的预问诊' : streaming ? '正在生成回复…' : 'Enter 发送 · 对话会保存到本次会话' }}</span><div><button class="secondary-button" :disabled="!sessionId || locked || streaming || suggested" @click="doTriage">生成建议并查看号源</button><button class="send-button" :disabled="!sessionId || locked || streaming || !input.trim()" @click="send">发送 ↑</button></div></div>
+          <div><span>{{ locked ? '本次会话已结束，可重新开始新的预问诊' : needsReview ? '建议等待人工复核，也可以继续补充信息' : streaming ? '正在生成回复…' : 'Enter 发送 · 对话会保存到本次会话' }}</span><div><button class="secondary-button" :disabled="!sessionId || locked || streaming || (suggested && !needsReview)" @click="doTriage">{{ needsReview ? '补充信息后重新分诊' : '生成建议并查看号源' }}</button><button class="send-button" :disabled="!sessionId || locked || streaming || !input.trim()" @click="send">发送 ↑</button></div></div>
         </footer>
       </article>
 
@@ -37,8 +37,9 @@
           <div v-if="sug.red_flag" class="urgent-notice">检测到危急征象，已切换急诊绿色通道</div>
           <span class="result-label">推荐就诊</span><h3>{{ sug.department_name }}</h3><p>{{ sug.doctor_name }} · {{ sug.suggested_date }}</p>
           <div class="result-reason"><b>为什么这样推荐</b><p>{{ sug.reason }}</p></div>
-          <button class="primary-button primary-button--wide" :disabled="registered || sug.can_register === false" @click="doRegister">{{ registered ? '预约已完成' : sug.can_register === false ? '当前暂无可约号源' : '确认并预约挂号' }}</button>
-          <small v-if="sug.can_register === false" class="booking-proof booking-proof--warning">建议重新开始分诊或联系人工服务</small>
+          <div v-if="sug.needs_confirmation" class="booking-proof booking-proof--warning">当前信息不足或需要人工核实，已进入人工复核；你也可以继续补充信息。</div>
+          <button class="primary-button primary-button--wide" :disabled="registered || sug.can_register === false || sug.needs_confirmation" @click="doRegister">{{ registered ? '预约已完成' : sug.needs_confirmation ? '等待人工确认' : sug.can_register === false ? '当前暂无可约号源' : '确认并预约挂号' }}</button>
+          <small v-if="sug.can_register === false && !sug.needs_confirmation" class="booking-proof booking-proof--warning">建议重新开始分诊或联系人工服务</small>
           <small v-if="registered" class="booking-proof">预约凭证 · {{ reg.work_date }} {{ reg.period }}</small>
         </article>
 
@@ -73,6 +74,7 @@ const input = ref('')
 const streaming = ref(false)
 const locked = ref(false)
 const suggested = ref(false)
+const needsReview = ref(false)
 const sug = ref({})
 const registered = ref(false)
 const reg = ref({})
@@ -105,6 +107,7 @@ async function restoreSession() {
     if (data.suggestion) {
       sug.value = data.suggestion
       suggested.value = true
+      needsReview.value = !!data.suggestion.needs_confirmation
       registered.value = Number(data.suggestion.registered) === 1 || !!data.registration
       if (data.registration) reg.value = data.registration
     }
@@ -119,7 +122,7 @@ async function start() {
   sessionId.value = r.sessionId
   localStorage.setItem('carenexus_pretriage_session', String(r.sessionId))
   msgs.value = []
-  locked.value = false; suggested.value = false; registered.value = false; sug.value = {}
+  locked.value = false; suggested.value = false; needsReview.value = false; registered.value = false; sug.value = {}
   ElMessage.success('会话已建立')
 }
 async function send() {
@@ -167,7 +170,8 @@ async function doTriage() {
   try {
     sug.value = await api.post('/patient/triage', { sessionId: sessionId.value, complaint })
     suggested.value = true
-    locked.value = true
+    needsReview.value = !!sug.value.needs_confirmation
+    locked.value = !needsReview.value || Number(sug.value.red_flag) === 1
   } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '暂时无法生成预约建议，请稍后重试') }
 }
 async function doRegister() {
