@@ -30,16 +30,19 @@ public class PatientController {
     private final MedicalRecordService records;
     private final com.hospital.v2.dao.Db db;
     private final CurrentUserService currentUser;
+    private final com.hospital.v2.service.ManualReviewService manualReviews;
 
     public PatientController(PreTriageService preTriage, ReActTriageAgent agent,
                              RegistrationService registration, MedicalRecordService records,
-                             com.hospital.v2.dao.Db db, CurrentUserService currentUser) {
+                             com.hospital.v2.dao.Db db, CurrentUserService currentUser,
+                             com.hospital.v2.service.ManualReviewService manualReviews) {
         this.preTriage = preTriage;
         this.agent = agent;
         this.registration = registration;
         this.records = records;
         this.db = db;
         this.currentUser = currentUser;
+        this.manualReviews = manualReviews;
     }
 
     @PostMapping("/session")
@@ -69,7 +72,7 @@ public class PatientController {
         Map<String, Object> suggestion = db.queryOne(
                 "SELECT s.id AS suggestion_id, s.department_id, dep.name AS department_name, "
                         + "s.doctor_id, doc.name AS doctor_name, s.confidence, s.red_flag, s.reason, s.status, "
-                        + "s.registered "
+                        + "s.registered, s.manual_question, s.review_note, s.reviewer, s.review_time "
                         + "FROM triage_suggestion s "
                         + "JOIN department dep ON dep.id=s.department_id "
                         + "JOIN doctor doc ON doc.id=s.doctor_id "
@@ -88,11 +91,16 @@ public class PatientController {
             Map<String, Object> slot = registration != null ? registration : schedule;
             suggestion.put("suggested_date", slot == null ? "" : String.valueOf(slot.get("work_date"))
                     + " " + String.valueOf(slot.get("period")));
-            boolean confirmed = "CONFIRMED".equals(String.valueOf(suggestion.get("status")))
+            String reviewStatus = String.valueOf(suggestion.get("status"));
+            boolean pendingReview = "PENDING".equals(reviewStatus) || "NEED_MORE_INFO".equals(reviewStatus);
+            boolean confirmed = "CONFIRMED".equals(reviewStatus) || "REGISTERED".equals(reviewStatus)
                     || registration != null;
-            suggestion.put("needs_confirmation", !confirmed);
+            suggestion.put("needs_confirmation", pendingReview);
             suggestion.put("can_register", registration != null || (confirmed && schedule != null));
-            suggestion.put("manual_review", "PENDING".equals(String.valueOf(suggestion.get("status"))));
+            suggestion.put("manual_review", pendingReview);
+            suggestion.put("queue_code", queueCode(suggestion.get("suggestion_id")));
+            suggestion.put("next_action", pendingReview ? "WAIT_FOR_NURSE"
+                    : confirmed ? "PATIENT_CAN_BOOK" : "CONTACT_HUMAN");
             out.put("suggestion", suggestion);
             if (registration != null) out.put("registration", registration);
         }
@@ -119,7 +127,10 @@ public class PatientController {
         SseEmitter em = new SseEmitter(60000L);
         CompletableFuture.runAsync(() -> {
             try {
-                if (msg != null && !msg.isBlank()) preTriage.appendUser(sessionId, msg);
+                if (msg != null && !msg.isBlank()) {
+                    preTriage.appendUser(sessionId, msg);
+                    manualReviews.reopenAfterPatientReply(sessionId);
+                }
                 boolean realStreaming = preTriage.streamReply(sessionId, msg == null ? "" : msg,
                         token -> send(em, token),
                         full -> { send(em, "[DONE]"); em.complete(); },
@@ -160,6 +171,15 @@ public class PatientController {
         TriageResult r = agent.triage(sessionId, ownPatientId, complaint);
         boolean needsReview = Boolean.TRUE.equals(r.suggestion().get("needs_confirmation"));
         boolean redFlag = Integer.valueOf(String.valueOf(r.suggestion().getOrDefault("red_flag", 0))) == 1;
+        long newSuggestionId = ((Number) r.suggestion().get("suggestion_id")).longValue();
+        db.update("UPDATE triage_suggestion SET status='SUPERSEDED' WHERE session_id=:session AND patient_id=:patient "
+                        + "AND id<>:current AND status IN ('PENDING','NEED_MORE_INFO') AND registered=0",
+                Map.of("session", sessionId, "patient", ownPatientId, "current", newSuggestionId));
+        r.suggestion().put("status", needsReview ? "PENDING" : "CONFIRMED");
+        r.suggestion().put("review_status", needsReview ? "PENDING" : "CONFIRMED");
+        r.suggestion().put("queue_code", queueCode(newSuggestionId));
+        r.suggestion().put("manual_review", needsReview);
+        r.suggestion().put("next_action", needsReview ? "WAIT_FOR_NURSE" : "PATIENT_CAN_BOOK");
         if (!needsReview || redFlag) {
             preTriage.lock(sessionId, redFlag ? "命中风险规则，已转人工/急诊处理" :
                     "分诊完成，建议科室(id=" + r.suggestion().get("department_id") + ")");
@@ -221,5 +241,10 @@ public class PatientController {
             out.add(text.substring(i, Math.min(i + step, text.length())));
         }
         return out;
+    }
+
+    private String queueCode(Object id) {
+        try { return "TRIAGE-" + String.format("%06d", Long.parseLong(String.valueOf(id))); }
+        catch (Exception e) { return "TRIAGE-UNKNOWN"; }
     }
 }

@@ -42,6 +42,17 @@ class AuthSecurityTest {
     }
 
     @Test
+    void nurseCanReadTriageQueueButCannotCrossRoleBoundaries() throws Exception {
+        String token = login("nurse", "123456");
+        mvc.perform(get("/api/nurse/triage/queue").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/admin/tools").header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/patient/profile").header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void loginIssuesHttpOnlySessionCookie() throws Exception {
         String body = json.createObjectNode().put("username", "patient").put("password", "123456").toString();
         String cookie = mvc.perform(post("/api/auth/login")

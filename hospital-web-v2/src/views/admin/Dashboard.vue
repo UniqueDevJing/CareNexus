@@ -9,17 +9,17 @@
       <article class="metric-tile"><span>今日分诊建议</span><strong>{{ ov.totalSuggestion || 0 }}</strong><small>已生成并可追踪</small></article>
       <article class="metric-tile"><span>建议转挂号</span><strong>{{ ov.hitRate || 0 }}<em>%</em></strong><small>建议后完成挂号</small></article>
       <article class="metric-tile"><span>号源使用率</span><strong>{{ enh.slotUsage || '0%' }}</strong><small>{{ enh.registrations || 0 }} 次有效挂号</small></article>
-      <article class="metric-tile" :class="{ 'metric-tile--alert': ov.redFlag || manualReviews.length }"><span>需要人工介入</span><strong>{{ manualReviews.length + Number(ov.redFlag || 0) }}</strong><small>{{ ov.pendingTriage || 0 }} 个会话待分诊</small></article>
+      <article class="metric-tile" :class="{ 'metric-tile--alert': ov.redFlag || manualReviews.length }"><span>人工队列</span><strong>{{ manualReviews.length }}</strong><small>{{ ov.waitingPatient || 0 }} 个等待患者补充</small></article>
     </section>
 
     <section class="surface review-panel" v-if="manualReviews.length">
       <header class="panel-head"><div><span class="eyebrow">HUMAN REVIEW QUEUE</span><h3>待人工导诊</h3></div><span class="panel-note">低证据、异常或需人工确认的分诊</span></header>
       <div class="run-feed">
           <article v-for="item in manualReviews" :key="item.suggestion_id" class="review-row">
-          <span class="run-state" :class="item.red_flag ? 'fail' : 'ok'"></span>
-            <div><strong>#{{ item.suggestion_id }} · {{ item.patient_name || '患者' }}</strong><small>{{ item.department_name || '待分诊' }} · {{ item.reason }}</small></div>
-            <input v-model="reviewNotes[item.suggestion_id]" class="review-note" placeholder="填写处理依据（必填）" @keyup.enter="resolveReview(item, item.red_flag ? 'REJECT' : 'CONFIRM')">
-            <div class="review-actions"><button class="text-button" @click="resolveReview(item, 'REJECT')">转人工</button><button v-if="!item.red_flag" class="text-button" @click="resolveReview(item, 'CONFIRM')">确认建议</button></div>
+            <span class="run-state" :class="item.red_flag ? 'fail' : item.status === 'NEED_MORE_INFO' ? 'wait' : 'ok'"></span>
+            <div><strong>#{{ item.suggestion_id }} · {{ item.patient_name || '患者' }}</strong><small>{{ item.department_name || '待分诊' }} · {{ statusLabel(item.status) }} · {{ item.reason }}</small><small v-if="item.manual_question">护士追问：{{ item.manual_question }}</small></div>
+            <input v-model="reviewNotes[item.suggestion_id]" class="review-note" :disabled="item.status !== 'PENDING'" :placeholder="item.status === 'PENDING' ? '填写处理依据（必填）' : '等待患者补充后再处理'" @keyup.enter="resolveReview(item, item.red_flag ? 'REJECT' : 'CONFIRM')">
+            <div class="review-actions"><template v-if="item.status === 'PENDING'"><button class="text-button" @click="resolveReview(item, 'REJECT')">转人工</button><button v-if="!item.red_flag" class="text-button" @click="resolveReview(item, 'CONFIRM')">确认建议</button></template><span v-else class="panel-note">患者回复后重新入队</span></div>
         </article>
       </div>
     </section>
@@ -103,6 +103,7 @@ const reviewNotes = reactive({})
 
 function short(s) { if (!s) return '—'; return s.length > 60 ? s.slice(0, 60) + '…' : s }
 function capacity(d) { return d.slots ? Math.min(Math.round((d.used / d.slots) * 100), 100) : 0 }
+function statusLabel(status) { return status === 'NEED_MORE_INFO' ? '等待患者补充' : status === 'PENDING' ? '待护士核对' : status || '待处理' }
 async function load() {
   ov.value = await api.get('/admin/dashboard/overview')
   byDept.value = await api.get('/admin/dashboard/by-department')

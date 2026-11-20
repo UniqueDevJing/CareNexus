@@ -3,6 +3,7 @@ package com.hospital.v2.service;
 import com.hospital.v2.common.BizException;
 import com.hospital.v2.dao.Db;
 import com.hospital.v2.domain.TriageResult;
+import com.hospital.v2.security.AuthPrincipal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +25,8 @@ class HospitalV2FlowTest {
     private ReActTriageAgent agent;
     @Autowired
     private RegistrationService registration;
+    @Autowired
+    private ManualReviewService manualReviews;
     @Autowired
     private Db db;
 
@@ -67,5 +70,47 @@ class HospitalV2FlowTest {
         assertDoesNotThrow(() -> registration.register(suggestionId, 2L));
         // 同一建议重复挂号应抛业务异常（乐观锁 + 唯一约束）
         assertThrows(BizException.class, () -> registration.register(suggestionId, 2L));
+    }
+
+    @Test
+    void nurse_question_waits_for_patient_then_reopens_queue() {
+        long sid = preTriage.startSession(1L);
+        TriageResult r = agent.triage(sid, 1L, "咳嗽一周，信息需要人工核对");
+        long suggestionId = ((Number) r.suggestion().get("suggestion_id")).longValue();
+        // 让测试明确覆盖人工队列状态，而不是依赖当前 Mock 模型是否返回低置信度。
+        db.update("UPDATE triage_suggestion SET status='PENDING' WHERE id=:id", Map.of("id", suggestionId));
+
+        Map<String, Object> asked = manualReviews.resolve(Map.of(
+                "suggestionId", suggestionId,
+                "action", "REQUEST_INFO",
+                "note", "请补充症状开始时间以及是否伴随发热"),
+                new AuthPrincipal(99L, "nurse-test", "nurse"));
+        assertEquals("NEED_MORE_INFO", asked.get("status"));
+        assertEquals("NEED_MORE_INFO", db.queryOne(
+                "SELECT status FROM triage_suggestion WHERE id=:id", Map.of("id", suggestionId)).get("status"));
+
+        preTriage.appendUser(sid, "从昨晚开始，没有发热");
+        manualReviews.reopenAfterPatientReply(sid);
+        assertEquals("PENDING", db.queryOne(
+                "SELECT status FROM triage_suggestion WHERE id=:id", Map.of("id", suggestionId)).get("status"));
+    }
+
+    @Test
+    void nurse_rejection_locks_session_and_ends_ambiguous_flow() {
+        long sid = preTriage.startSession(1L);
+        TriageResult r = agent.triage(sid, 1L, "信息无法确认，需要人工服务");
+        long suggestionId = ((Number) r.suggestion().get("suggestion_id")).longValue();
+        db.update("UPDATE triage_suggestion SET status='PENDING' WHERE id=:id", Map.of("id", suggestionId));
+
+        Map<String, Object> rejected = manualReviews.resolve(Map.of(
+                "suggestionId", suggestionId,
+                "action", "REJECT",
+                "note", "无法安全确认普通预约，转门诊人工服务"),
+                new AuthPrincipal(99L, "nurse-test", "nurse"));
+        assertEquals("REJECTED", rejected.get("status"));
+        Map<String, Object> session = db.queryOne(
+                "SELECT status, locked FROM pre_triage_session WHERE id=:id", Map.of("id", sid));
+        assertEquals("LOCKED", session.get("status"));
+        assertEquals(1, ((Number) session.get("locked")).intValue());
     }
 }
