@@ -29,11 +29,24 @@ public final class SensitiveDataCrypto {
 
     public SensitiveDataCrypto(@Value("${hospital.crypto.aes-key}") String encodedKey) {
         try {
-            byte[] decoded = Base64.getDecoder().decode(encodedKey);
-            if (decoded.length != 32) throw new IllegalStateException("hospital.crypto.aes-key 必须是 Base64 编码的 32 字节密钥");
-            this.key = decoded;
-        } catch (IllegalArgumentException e) {
-            throw new IllegalStateException("hospital.crypto.aes-key 不是有效的 Base64 密钥", e);
+            byte[] decoded = null;
+            try {
+                decoded = Base64.getDecoder().decode(encodedKey);
+            } catch (IllegalArgumentException ignored) {
+                // Existing installations may provide a raw JWT secret.
+            }
+            if (decoded != null && decoded.length == 32) {
+                this.key = decoded;
+            } else if (encodedKey != null && encodedKey.getBytes(StandardCharsets.UTF_8).length >= 32) {
+                // Backward-compatible bridge for existing servers that only
+                // have AUTH_JWT_SECRET. Provision CARENEXUS_AES_KEY separately
+                // before treating the deployment as fully production-hardened.
+                this.key = MessageDigest.getInstance("SHA-256").digest(encodedKey.getBytes(StandardCharsets.UTF_8));
+            } else {
+                throw new IllegalStateException("hospital.crypto.aes-key 必须是 Base64 32 字节密钥，或至少 32 字符的旧 JWT 密钥");
+            }
+        } catch (Exception e) {
+            throw new IllegalStateException("hospital.crypto.aes-key 初始化失败", e);
         }
     }
 

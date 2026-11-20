@@ -17,7 +17,9 @@ hospital:
     # Production profile must receive an explicit protocol decision from the environment.
     cookie-secure: ${AUTH_COOKIE_SECURE}
   crypto:
-    aes-key: ${CARENEXUS_AES_KEY}
+    # Prefer an independent Base64 AES key. The JWT fallback keeps existing
+    # installations bootable until CARENEXUS_AES_KEY is provisioned separately.
+    aes-key: ${CARENEXUS_AES_KEY:${AUTH_JWT_SECRET}}
   llm:
     mode: ${LLM_MODE:real}
     base-url: ${LLM_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}

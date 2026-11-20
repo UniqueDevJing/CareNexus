@@ -27,4 +27,11 @@ class SensitiveDataCryptoTest {
         assertEquals("f42e1f9dfd9a95374bfc856a930faa1b7a083fc72c3a1509c231c45566c804ca",
                 crypto.sha256("not-a-real-id"));
     }
+
+    @Test
+    void acceptsLegacyLongJwtSecretAsCompatibilityKey() {
+        SensitiveDataCrypto legacyCrypto = new SensitiveDataCrypto("legacy-jwt-secret-that-is-at-least-32-chars");
+        String ciphertext = legacyCrypto.encrypt("13800138000");
+        assertEquals("13800138000", legacyCrypto.decrypt(ciphertext));
+    }
 }
