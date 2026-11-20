@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +28,10 @@ class HospitalV2FlowTest {
     private RegistrationService registration;
     @Autowired
     private ManualReviewService manualReviews;
+    @Autowired
+    private PaymentService payments;
+    @Autowired
+    private ClinicalOrderService orders;
     @Autowired
     private Db db;
 
@@ -112,5 +117,50 @@ class HospitalV2FlowTest {
                 "SELECT status, locked FROM pre_triage_session WHERE id=:id", Map.of("id", sid));
         assertEquals("LOCKED", session.get("status"));
         assertEquals(1, ((Number) session.get("locked")).intValue());
+    }
+
+    @Test
+    void balance_payment_is_atomic_and_refundable() {
+        db.update("UPDATE patient_profile SET balance=:balance WHERE id=:id",
+                Map.of("balance", new BigDecimal("100.00"), "id", 1L));
+        long billId = payments.createRegistrationBill(90001L, 1L, new BigDecimal("12.50"));
+
+        payments.payBill(billId, 1L, "BALANCE", null);
+        assertEquals("PAID", db.queryOne("SELECT status FROM bill WHERE id=:id", Map.of("id", billId)).get("status"));
+        assertEquals(new BigDecimal("87.50"), db.queryOne(
+                "SELECT balance FROM patient_profile WHERE id=1", Map.of()).get("balance"));
+        assertThrows(BizException.class, () -> payments.payBill(billId, 1L, "BALANCE", null));
+
+        payments.refundBill(billId, "测试退费");
+        assertEquals("REFUNDED", db.queryOne("SELECT status FROM bill WHERE id=:id", Map.of("id", billId)).get("status"));
+        assertEquals(new BigDecimal("100.00"), db.queryOne(
+                "SELECT balance FROM patient_profile WHERE id=1", Map.of()).get("balance"));
+    }
+
+    @Test
+    void paid_clinical_orders_reach_pharmacy_and_are_dispensed_once() {
+        db.update("UPDATE patient_profile SET balance=100.00 WHERE id=1", Map.of());
+        LocalDate date = LocalDate.now().plusDays(40);
+        long registrationId = db.insert("INSERT INTO registration(suggestion_id,patient_id,department_id,doctor_id,schedule_id,work_date,period,status,payment_status) "
+                + "VALUES(NULL,1,1,1,1,:date,'AM','PAID','PAID')", Map.of("date", date));
+        Map<String, Object> exam = orders.createExam(Map.of(
+                "registrationId", registrationId, "patientId", 1L, "itemName", "血常规", "itemCode", "CBC", "fee", "5.00"), 1L);
+        long examBill = ((Number) exam.get("bill_id")).longValue();
+        payments.payBill(examBill, 1L, "BALANCE", null);
+        assertEquals("PAID", db.queryOne("SELECT status FROM bill WHERE id=:id", Map.of("id", examBill)).get("status"));
+
+        Map<String, Object> prescription = orders.createPrescription(Map.of(
+                "registrationId", registrationId, "patientId", 1L,
+                "items", List.of(Map.of("drugName", "示例药品", "dosage", "1片", "frequency", "每日一次",
+                        "days", 3, "quantity", "2.00", "unitPrice", "2.00"))), 1L);
+        long prescriptionId = ((Number) prescription.get("id")).longValue();
+        long prescriptionBill = ((Number) prescription.get("bill_id")).longValue();
+        assertTrue(orders.pharmacyQueue().stream().noneMatch(row -> ((Number) row.get("prescription_id")).longValue() == prescriptionId));
+        assertThrows(BizException.class, () -> orders.dispense(prescriptionId, 5L));
+        payments.payBill(prescriptionBill, 1L, "BALANCE", null);
+        assertTrue(orders.pharmacyQueue().stream().anyMatch(row -> ((Number) row.get("prescription_id")).longValue() == prescriptionId));
+        orders.dispense(prescriptionId, 5L);
+        assertEquals("DISPENSED", db.queryOne("SELECT status FROM prescription WHERE id=:id", Map.of("id", prescriptionId)).get("status"));
+        assertThrows(BizException.class, () -> orders.dispense(prescriptionId, 5L));
     }
 }

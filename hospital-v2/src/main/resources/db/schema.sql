@@ -11,8 +11,8 @@ CREATE TABLE user_account (
     password     VARCHAR(128) NOT NULL,
     real_name    VARCHAR(32),
     role         VARCHAR(16)  NOT NULL COMMENT 'admin|nurse|doctor|patient',
-    phone        VARCHAR(20),
-    id_card      VARCHAR(32),
+    phone        VARCHAR(96) COMMENT 'AES-256-GCM 密文',
+    id_card      VARCHAR(96) COMMENT 'AES-256-GCM 密文',
     create_time  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uk_username (username)
@@ -38,6 +38,7 @@ CREATE TABLE doctor (
     title         VARCHAR(32)  COMMENT '主任医师/副主任医师/主治医师',
     specialty     VARCHAR(64),
     good_at       VARCHAR(255),
+    registration_fee DECIMAL(10,2) NOT NULL DEFAULT 30.00 COMMENT '挂号费',
     user_id       BIGINT        COMMENT '开通的医生登录账号（user_account.id）',
     create_time   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
@@ -67,7 +68,10 @@ CREATE TABLE patient_profile (
     name            VARCHAR(32),
     gender          VARCHAR(4),
     age             INT,
-    id_card         VARCHAR(32),
+    id_card         VARCHAR(96) COMMENT 'AES-256-GCM 密文',
+    phone           VARCHAR(96) COMMENT 'AES-256-GCM 密文',
+    balance         DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '患者账户余额',
+    id_card_hash    VARCHAR(64) COMMENT '身份证号SHA-256哈希，用于精确检索',
     allergic_history VARCHAR(255),
     past_history    VARCHAR(255),
     create_time     DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -245,12 +249,128 @@ CREATE TABLE registration (
     work_date      DATE         NOT NULL,
     period         VARCHAR(8)   NOT NULL,
     status         VARCHAR(16)  NOT NULL DEFAULT 'PAID' COMMENT 'PAID|DONE|CANCEL',
+    payment_status VARCHAR(16)  NOT NULL DEFAULT 'UNPAID' COMMENT 'UNPAID|PAID|REFUNDED',
     create_time    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uk_reg_patient (patient_id, work_date, period)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 19. 病历
+-- 19. 账单、支付流水与余额流水
+CREATE TABLE bill (
+    id            BIGINT        NOT NULL AUTO_INCREMENT,
+    patient_id    BIGINT        NOT NULL,
+    bill_type     VARCHAR(32)   NOT NULL DEFAULT 'REGISTRATION' COMMENT 'REGISTRATION|EXAMINATION|PRESCRIPTION|OTHER',
+    source_id     BIGINT        DEFAULT NULL COMMENT '关联业务单据ID',
+    amount        DECIMAL(10,2) NOT NULL,
+    status        VARCHAR(16)   NOT NULL DEFAULT 'UNPAID' COMMENT 'UNPAID|PAID|REFUNDED|CANCELLED',
+    description   VARCHAR(512),
+    paid_at       DATETIME      DEFAULT NULL,
+    create_time   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_bill_source (bill_type, source_id),
+    KEY idx_bill_patient (patient_id),
+    KEY idx_bill_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE payment_record (
+    id               BIGINT        NOT NULL AUTO_INCREMENT,
+    bill_id          BIGINT        NOT NULL,
+    patient_id       BIGINT        NOT NULL,
+    transaction_type VARCHAR(16)   NOT NULL DEFAULT 'PAYMENT' COMMENT 'PAYMENT|REFUND',
+    amount           DECIMAL(10,2) NOT NULL,
+    channel          VARCHAR(32)   NOT NULL DEFAULT 'CASH' COMMENT 'CASH|WECHAT|ALIPAY|CARD|BALANCE',
+    trade_no         VARCHAR(128),
+    status           VARCHAR(16)   NOT NULL DEFAULT 'SUCCESS',
+    refund_reason    VARCHAR(256),
+    created_at       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_payment_bill (bill_id),
+    KEY idx_payment_patient (patient_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE balance_ledger (
+    id            BIGINT        NOT NULL AUTO_INCREMENT,
+    patient_id    BIGINT        NOT NULL,
+    change_type   VARCHAR(32)   NOT NULL COMMENT 'RECHARGE|DEDUCT|REFUND',
+    amount        DECIMAL(10,2) NOT NULL COMMENT '正数入账，负数扣费',
+    balance_after DECIMAL(10,2) NOT NULL,
+    ref_bill_id   BIGINT        DEFAULT NULL,
+    remark        VARCHAR(256),
+    created_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_balance_patient (patient_id),
+    KEY idx_balance_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 20. 检查申请（医生开立、检查人员回填结果、患者查看）
+CREATE TABLE exam_order (
+    id              BIGINT        NOT NULL AUTO_INCREMENT,
+    registration_id BIGINT        NOT NULL,
+    patient_id      BIGINT        NOT NULL,
+    doctor_id       BIGINT        NOT NULL,
+    item_code       VARCHAR(32),
+    item_name       VARCHAR(128)   NOT NULL,
+    fee             DECIMAL(10,2)  NOT NULL,
+    status          VARCHAR(24)   NOT NULL DEFAULT 'ORDERED' COMMENT 'ORDERED|SAMPLE_COLLECTED|RESULT_READY|CANCELLED',
+    result_text     TEXT,
+    performed_by    BIGINT,
+    result_time     DATETIME,
+    create_time     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_exam_patient (patient_id),
+    KEY idx_exam_registration (registration_id),
+    KEY idx_exam_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 21. 处方与药品明细（医生开立、药房核验发药）
+CREATE TABLE prescription (
+    id              BIGINT        NOT NULL AUTO_INCREMENT,
+    registration_id BIGINT        NOT NULL,
+    patient_id      BIGINT        NOT NULL,
+    doctor_id       BIGINT        NOT NULL,
+    status          VARCHAR(24)   NOT NULL DEFAULT 'ISSUED' COMMENT 'ISSUED|DISPENSING|DISPENSED|CANCELLED',
+    total_amount    DECIMAL(10,2)  NOT NULL,
+    note            VARCHAR(512),
+    create_time     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_rx_patient (patient_id),
+    KEY idx_rx_registration (registration_id),
+    KEY idx_rx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE prescription_item (
+    id              BIGINT        NOT NULL AUTO_INCREMENT,
+    prescription_id BIGINT        NOT NULL,
+    drug_code       VARCHAR(64),
+    drug_name       VARCHAR(128)   NOT NULL,
+    dosage          VARCHAR(64)    NOT NULL,
+    frequency       VARCHAR(64)    NOT NULL,
+    days            INT            NOT NULL,
+    quantity        DECIMAL(10,2)  NOT NULL,
+    unit_price      DECIMAL(10,2)  NOT NULL,
+    amount          DECIMAL(10,2)  NOT NULL,
+    dispense_status VARCHAR(16)    NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING|DISPENSED',
+    PRIMARY KEY (id),
+    KEY idx_rx_item_prescription (prescription_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE pharmacy_dispense (
+    id              BIGINT        NOT NULL AUTO_INCREMENT,
+    prescription_id BIGINT        NOT NULL,
+    item_id         BIGINT        NOT NULL,
+    pharmacist_id   BIGINT,
+    quantity        DECIMAL(10,2)  NOT NULL,
+    status          VARCHAR(16)   NOT NULL DEFAULT 'SUCCESS',
+    dispense_time   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_dispense_item (item_id),
+    KEY idx_dispense_rx (prescription_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 22. 病历
 CREATE TABLE medical_record (
     id                BIGINT       NOT NULL AUTO_INCREMENT,
     registration_id   BIGINT       NOT NULL,
@@ -269,7 +389,7 @@ CREATE TABLE medical_record (
     PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 20. AI 调用观测（每次对话/Embedding 调用都记）
+-- 23. AI 调用观测（每次对话/Embedding 调用都记）
 CREATE TABLE ai_usage_log (
     id             BIGINT       NOT NULL AUTO_INCREMENT,
     use_case       VARCHAR(32)  NOT NULL COMMENT 'pretriage|triage|embedding|reason',
@@ -285,7 +405,7 @@ CREATE TABLE ai_usage_log (
     KEY idx_usage_case (use_case)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 21. 症状→科室映射（RAG 兜底 + 二次核验参考）
+-- 24. 症状→科室映射（RAG 兜底 + 二次核验参考）
 CREATE TABLE symptom_department_map (
     id              BIGINT       NOT NULL AUTO_INCREMENT,
     symptom_keyword VARCHAR(64) NOT NULL,
@@ -296,7 +416,7 @@ CREATE TABLE symptom_department_map (
     KEY idx_symp (symptom_keyword)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 22. AI 模型配置（管理端可配）
+-- 25. AI 模型配置（管理端可配）
 CREATE TABLE ai_model_config (
     id         BIGINT       NOT NULL AUTO_INCREMENT,
     name       VARCHAR(64)  NOT NULL,
@@ -312,7 +432,7 @@ CREATE TABLE ai_model_config (
     PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 23. 操作审计
+-- 26. 操作审计
 CREATE TABLE operation_audit (
     id         BIGINT       NOT NULL AUTO_INCREMENT,
     operator   VARCHAR(32),

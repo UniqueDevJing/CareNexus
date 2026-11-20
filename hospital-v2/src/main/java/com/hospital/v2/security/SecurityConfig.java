@@ -18,13 +18,13 @@ public class SecurityConfig {
     PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
 
     @Bean
-    SecurityFilterChain security(HttpSecurity http, JwtAuthFilter jwt) throws Exception {
+    SecurityFilterChain security(HttpSecurity http, JwtAuthFilter jwt, RequestRateLimitFilter rateLimit) throws Exception {
         return http.csrf(c -> c.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(a -> a
                         .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
+                        .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/refresh").permitAll()
                         .requestMatchers("/api/health").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/nurse/**").hasRole("NURSE")
@@ -34,6 +34,7 @@ public class SecurityConfig {
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint((req, res, ex) -> write(res, 401, "未登录或登录已过期"))
                         .accessDeniedHandler((req, res, ex) -> write(res, 403, "无权访问该角色资源")))
+                .addFilterBefore(rateLimit, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwt, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }

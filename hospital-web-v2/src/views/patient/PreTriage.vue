@@ -63,7 +63,7 @@
           </div>
           <div v-else-if="sug.status === 'REJECTED'" class="booking-handoff booking-handoff--warning"><strong>当前建议未进入预约</strong><p>系统无法安全确认本次安排，已转人工处理。请继续补充症状，或联系门诊服务台。</p></div>
           <button v-else class="primary-button primary-button--wide" :disabled="registered || sug.can_register === false" @click="doRegister">{{ registered ? '预约已完成' : sug.can_register === false ? '当前暂无可约号源' : '确认并预约挂号' }} <span v-if="!registered" aria-hidden="true">→</span></button>
-          <small v-if="registered" class="booking-proof">预约凭证 · {{ reg.work_date }} {{ reg.period }}</small>
+          <div v-if="registered" class="booking-proof"><small>预约凭证 · {{ reg.work_date }} {{ reg.period }}</small><span v-if="reg.payment_status !== 'PAID'">挂号已保留，完成支付后进入正式接诊</span><router-link v-if="reg.payment_status !== 'PAID'" to="/patient/bills">去账单支付 →</router-link></div>
         </article>
 
         <article v-else class="care-safety-card">

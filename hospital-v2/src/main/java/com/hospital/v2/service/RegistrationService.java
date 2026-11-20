@@ -6,20 +6,22 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
-import java.util.Map;
 
 /** 预约挂号：乐观锁扣减号源 + 不可重复预约 + 标记分诊命中。 */
 @Service
 public class RegistrationService {
     private final Db db;
+    private final PaymentService payments;
 
-    public RegistrationService(Db db) {
+    public RegistrationService(Db db, PaymentService payments) {
         this.db = db;
+        this.payments = payments;
     }
 
     @Transactional
@@ -70,12 +72,19 @@ public class RegistrationService {
         // 标记分诊命中（命中率统计用）
         db.update("UPDATE triage_suggestion SET registered=1, status='REGISTERED' WHERE id=:id", Map.of("id", suggestionId));
 
+        Map<String, Object> doctor = db.queryOne("SELECT registration_fee FROM doctor WHERE id=:id", Map.of("id", doc));
+        BigDecimal fee = doctor == null || doctor.get("registration_fee") == null
+                ? new BigDecimal("30.00") : new BigDecimal(String.valueOf(doctor.get("registration_fee")));
+        long billId = payments.createRegistrationBill(regId, patientId, fee);
+
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("registration_id", regId);
         out.put("department_id", dept);
         out.put("doctor_id", doc);
         out.put("work_date", sched.get("work_date"));
         out.put("period", sched.get("period"));
+        out.put("bill_id", billId);
+        out.put("payment_status", "UNPAID");
         return out;
     }
 

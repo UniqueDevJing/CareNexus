@@ -10,6 +10,7 @@ const SymptomLibrary = () => import('../views/admin/SymptomLibrary.vue')
 const AdminModule = () => import('../views/admin/AdminModule.vue')
 const PreTriage = () => import('../views/patient/PreTriage.vue')
 const Records = () => import('../views/patient/Records.vue')
+const MyBills = () => import('../views/patient/MyBills.vue')
 const DoctorConsole = () => import('../views/doctor/DoctorConsole.vue')
 const NurseTriage = () => import('../views/nurse/NurseTriage.vue')
 const Login = () => import('../views/Login.vue')
@@ -33,7 +34,8 @@ const routes = [
   { path: '/doctor/console', name: 'doctorConsole', component: DoctorConsole, meta: { group: 'doctor', title: '门诊接诊台', tag: 'EMR' } },
   { path: '/nurse/triage', name: 'nurseTriage', component: NurseTriage, meta: { group: 'nurse', title: '人工导诊台', tag: 'TRIAGE' } },
   { path: '/patient/pre', name: 'pre', component: PreTriage, meta: { group: 'patient', title: '智能预问诊', tag: 'SSE' } },
-  { path: '/patient/records', name: 'records', component: Records, meta: { group: 'patient', title: '我的就诊', tag: 'EMR' } }
+  { path: '/patient/records', name: 'records', component: Records, meta: { group: 'patient', title: '我的就诊', tag: 'EMR' } },
+  { path: '/patient/bills', name: 'bills', component: MyBills, meta: { group: 'patient', title: '我的账单', tag: 'PAY' } }
 ]
 
 const router = createRouter({

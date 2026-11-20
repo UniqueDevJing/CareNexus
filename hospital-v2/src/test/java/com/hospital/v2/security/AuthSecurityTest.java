@@ -14,6 +14,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @SpringBootTest(properties =
         "spring.datasource.url=jdbc:h2:mem:hospital_auth;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE")
@@ -59,8 +61,25 @@ class AuthSecurityTest {
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getHeader("Set-Cookie");
-        org.junit.jupiter.api.Assertions.assertNotNull(cookie);
+        assertNotNull(cookie);
         org.junit.jupiter.api.Assertions.assertTrue(cookie.contains("hospital_session=") && cookie.contains("HttpOnly"));
+    }
+
+    @Test
+    void refreshCookie_rotates_access_cookie_without_exposing_refresh_token() throws Exception {
+        String body = json.createObjectNode().put("username", "patient").put("password", "123456").toString();
+        var login = mvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andReturn();
+        var refresh = login.getResponse().getCookie("hospital_refresh");
+        assertNotNull(refresh);
+        assertEquals("hospital_refresh", refresh.getName());
+        var response = mvc.perform(post("/api/auth/refresh").cookie(refresh))
+                .andExpect(status().isOk())
+                .andReturn().getResponse();
+        assertNotNull(response.getCookie("hospital_session"));
+        org.junit.jupiter.api.Assertions.assertFalse(response.getContentAsString().contains("hospital_refresh"));
     }
 
     @Test

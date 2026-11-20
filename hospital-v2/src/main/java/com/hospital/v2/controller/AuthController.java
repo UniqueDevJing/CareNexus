@@ -5,6 +5,7 @@ import com.hospital.v2.common.Result;
 import com.hospital.v2.dao.Db;
 import com.hospital.v2.security.AuthPrincipal;
 import com.hospital.v2.security.TokenService;
+import com.hospital.v2.security.SensitiveDataCrypto;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -24,17 +25,22 @@ public class AuthController {
     private final Db db;
     private final PasswordEncoder passwords;
     private final TokenService tokens;
+    private final SensitiveDataCrypto crypto;
     private final boolean cookieSecure;
     private final long cookieMaxAgeSeconds;
+    private final long refreshCookieMaxAgeSeconds;
 
-    public AuthController(Db db, PasswordEncoder passwords, TokenService tokens,
+    public AuthController(Db db, PasswordEncoder passwords, TokenService tokens, SensitiveDataCrypto crypto,
                           @Value("${hospital.auth.cookie-secure:false}") boolean cookieSecure,
-                          @Value("${hospital.auth.token-hours:8}") long tokenHours) {
+                          @Value("${hospital.auth.token-hours:8}") long tokenHours,
+                          @Value("${hospital.auth.refresh-days:30}") long refreshDays) {
         this.db = db;
         this.passwords = passwords;
         this.tokens = tokens;
+        this.crypto = crypto;
         this.cookieSecure = cookieSecure;
         this.cookieMaxAgeSeconds = Math.max(1, tokenHours) * 3600;
+        this.refreshCookieMaxAgeSeconds = Math.max(1, refreshDays) * 86400;
     }
 
     @PostMapping("/login")
@@ -51,6 +57,7 @@ public class AuthController {
                 String.valueOf(row.get("role")));
         Map<String, Object> out = response(p, String.valueOf(row.get("real_name")));
         setSessionCookie(response, String.valueOf(out.get("token")));
+        setRefreshCookie(response, tokens.issueRefresh(p));
         return Result.ok(out);
     }
 
@@ -68,17 +75,24 @@ public class AuthController {
         }
         Map<String, Object> u = new LinkedHashMap<>();
         u.put("username", username); u.put("password", passwords.encode(password));
-        u.put("real_name", name); u.put("role", "patient"); u.put("phone", text(body.get("phone")));
+        String phone = text(body.get("phone"));
+        String idCard = text(body.get("id_card"));
+        u.put("real_name", name); u.put("role", "patient"); u.put("phone", crypto.encrypt(phone));
+        u.put("id_card", crypto.encrypt(idCard));
         long uid;
         try {
-            uid = db.insert("INSERT INTO user_account(username,password,real_name,role,phone) "
-                    + "VALUES(:username,:password,:real_name,:role,:phone)", u);
+            uid = db.insert("INSERT INTO user_account(username,password,real_name,role,phone,id_card) "
+                    + "VALUES(:username,:password,:real_name,:role,:phone,:id_card)", u);
             Map<String, Object> patient = new LinkedHashMap<>();
             patient.put("uid", uid); patient.put("name", name); patient.put("gender", text(body.get("gender")));
+            patient.put("phone", crypto.encrypt(phone));
+            patient.put("id_card", crypto.encrypt(idCard));
+            patient.put("id_card_hash", crypto.sha256(idCard));
             int age = number(body.get("age"), 0);
             if (age < 0 || age > 130) throw new BizException("年龄需为 0-130 的整数");
             patient.put("age", age);
-            db.insert("INSERT INTO patient_profile(user_id,name,gender,age) VALUES(:uid,:name,:gender,:age)", patient);
+            db.insert("INSERT INTO patient_profile(user_id,name,gender,age,phone,id_card,id_card_hash) "
+                    + "VALUES(:uid,:name,:gender,:age,:phone,:id_card,:id_card_hash)", patient);
         } catch (DuplicateKeyException e) {
             throw new BizException("用户名已存在");
         }
@@ -86,6 +100,7 @@ public class AuthController {
         Map<String, Object> out = response(p, name);
         // 注册成功即建立同一 HttpOnly 会话，避免前端只能拿到响应 token 却无法进入受保护页面。
         setSessionCookie(response, String.valueOf(out.get("token")));
+        setRefreshCookie(response, tokens.issueRefresh(p));
         return Result.ok(out);
     }
 
@@ -95,11 +110,29 @@ public class AuthController {
     @PostMapping("/logout")
     public Result<?> logout(HttpServletResponse response) {
         response.addHeader(HttpHeaders.SET_COOKIE, sessionCookie("").maxAge(0).build().toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie("").maxAge(0).build().toString());
         return Result.ok();
+    }
+
+    /** 用 HttpOnly refresh cookie 换取短时 access cookie，前端不接触 refresh token。 */
+    @PostMapping("/refresh")
+    public Result<?> refresh(@CookieValue(value = "hospital_refresh", required = false) String refreshToken,
+                             HttpServletResponse response) {
+        if (refreshToken == null || refreshToken.isBlank()) throw new BizException(401, "刷新令牌不存在或已失效");
+        AuthPrincipal p;
+        try { p = tokens.verifyRefresh(refreshToken); }
+        catch (IllegalArgumentException e) { throw new BizException(401, "刷新令牌不存在或已失效"); }
+        Map<String, Object> out = response(p, p.username());
+        setSessionCookie(response, String.valueOf(out.get("token")));
+        return Result.ok(Map.of("token", out.get("token"), "expiresIn", cookieMaxAgeSeconds));
     }
 
     private void setSessionCookie(HttpServletResponse response, String token) {
         response.addHeader(HttpHeaders.SET_COOKIE, sessionCookie(token).build().toString());
+    }
+
+    private void setRefreshCookie(HttpServletResponse response, String token) {
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie(token).build().toString());
     }
 
     private ResponseCookie.ResponseCookieBuilder sessionCookie(String token) {
@@ -111,10 +144,20 @@ public class AuthController {
                 .maxAge(token.isBlank() ? 0 : cookieMaxAgeSeconds);
     }
 
+    private ResponseCookie.ResponseCookieBuilder refreshCookie(String token) {
+        return ResponseCookie.from("hospital_refresh", token)
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite("Lax")
+                .path("/v2/api/auth")
+                .maxAge(token.isBlank() ? 0 : refreshCookieMaxAgeSeconds);
+    }
+
     private Map<String, Object> response(AuthPrincipal p, String name) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("token", tokens.issue(p)); out.put("userId", p.userId());
         out.put("username", p.username()); out.put("name", name); out.put("role", p.role());
+        out.put("expiresIn", cookieMaxAgeSeconds);
         return out;
     }
 

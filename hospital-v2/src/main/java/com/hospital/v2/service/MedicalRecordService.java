@@ -34,9 +34,12 @@ public class MedicalRecordService {
         long patientId = requiredId(body, "patient_id");
         long doctorId = requiredId(body, "doctor_id");
         Map<String, Object> registration = db.queryOne(
-                "SELECT id FROM registration WHERE id=:registration AND patient_id=:patient AND doctor_id=:doctor",
+                "SELECT id, payment_status FROM registration WHERE id=:registration AND patient_id=:patient AND doctor_id=:doctor",
                 Map.of("registration", registrationId, "patient", patientId, "doctor", doctorId));
         if (registration == null) throw new BizException("病历必须绑定当前医生负责的患者和挂号");
+        if (!"PAID".equals(String.valueOf(registration.get("payment_status")))) {
+            throw new BizException("挂号费用尚未支付，不能建立正式病历");
+        }
         if (id == null) {
             return db.insert("INSERT INTO medical_record (registration_id, patient_id, doctor_id, chief_complaint, "
                     + "present_illness, past_history, allergy_history, assistant_exam, diagnosis, treatment, status) "
@@ -60,6 +63,10 @@ public class MedicalRecordService {
     /** 提交病历：草稿 → SUBMITTED 锁定；同步把对应挂号置为 DONE（完成就诊）。 */
     @Transactional
     public void submit(long recordId, long registrationId) {
+        Map<String, Object> payment = db.queryOne("SELECT payment_status FROM registration WHERE id=:id", Map.of("id", registrationId));
+        if (payment == null || !"PAID".equals(String.valueOf(payment.get("payment_status")))) {
+            throw new BizException("挂号费用尚未支付，不能完成接诊");
+        }
         int aff = db.update("UPDATE medical_record SET status='SUBMITTED' WHERE id=:id AND registration_id=:registration AND status='DRAFT'",
                 Map.of("id", recordId, "registration", registrationId));
         if (aff == 0) throw new BizException("病历不存在、挂号不匹配或已提交");
@@ -76,9 +83,9 @@ public class MedicalRecordService {
     /** 完成就诊（不写病历直接结诊）。 */
     @Transactional
     public void finishVisit(long registrationId) {
-        int aff = db.update("UPDATE registration SET status='DONE' WHERE id=:id AND status='PAID'",
+        int aff = db.update("UPDATE registration SET status='DONE' WHERE id=:id AND status='PAID' AND payment_status='PAID'",
                 Map.of("id", registrationId));
-        if (aff == 0) throw new BizException("挂号不存在或已结诊");
+        if (aff == 0) throw new BizException("挂号不存在、费用未支付或已结诊");
     }
 
     public Map<String, Object> detail(long recordId) {
@@ -95,7 +102,7 @@ public class MedicalRecordService {
 
     /** 医生名下待接诊/已接诊挂号列表（含是否已写病历）。 */
     public List<Map<String, Object>> doctorRegistrations(long doctorId) {
-        return db.query("SELECT r.id registration_id, r.patient_id, r.work_date, r.period, r.status, "
+        return db.query("SELECT r.id registration_id, r.patient_id, r.work_date, r.period, r.status, r.payment_status, "
                 + "p.name patient_name, p.gender, p.age, p.past_history, p.allergic_history, "
                 + "dep.name department, mr.id record_id, mr.status record_status "
                 + "FROM registration r LEFT JOIN patient_profile p ON p.id=r.patient_id "

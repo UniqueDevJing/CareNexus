@@ -2,6 +2,7 @@ package com.hospital.v2.controller;
 
 import com.hospital.v2.common.Result;
 import com.hospital.v2.service.MedicalRecordService;
+import com.hospital.v2.service.ClinicalOrderService;
 import com.hospital.v2.security.AuthPrincipal;
 import com.hospital.v2.security.CurrentUserService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -15,10 +16,12 @@ import java.util.Map;
 public class DoctorController {
     private final MedicalRecordService records;
     private final CurrentUserService currentUser;
+    private final ClinicalOrderService orders;
 
-    public DoctorController(MedicalRecordService records, CurrentUserService currentUser) {
+    public DoctorController(MedicalRecordService records, CurrentUserService currentUser, ClinicalOrderService orders) {
         this.records = records;
         this.currentUser = currentUser;
+        this.orders = orders;
     }
 
     /** 我的接诊列表：挂号 + 患者档案 + 病历状态。 */
@@ -64,5 +67,33 @@ public class DoctorController {
     public Result<?> detail(@RequestParam long recordId, @AuthenticationPrincipal AuthPrincipal principal) {
         currentUser.assertDoctorOwnsRecord(principal, recordId);
         return Result.ok(records.detail(recordId));
+    }
+
+    @PostMapping("/exam-orders")
+    public Result<?> createExam(@RequestBody Map<String, Object> body,
+                                @AuthenticationPrincipal AuthPrincipal principal) {
+        return Result.ok(orders.createExam(body, currentUser.doctorId(principal,
+                body.get("doctorId") instanceof Number n ? n.longValue() : null)));
+    }
+
+    @PostMapping("/prescriptions")
+    public Result<?> createPrescription(@RequestBody Map<String, Object> body,
+                                        @AuthenticationPrincipal AuthPrincipal principal) {
+        return Result.ok(orders.createPrescription(body, currentUser.doctorId(principal,
+                body.get("doctorId") instanceof Number n ? n.longValue() : null)));
+    }
+
+    @GetMapping("/exam-orders")
+    public Result<?> examOrders(@RequestParam long registrationId,
+                                @AuthenticationPrincipal AuthPrincipal principal) {
+        currentUser.assertDoctorOwnsRegistration(principal, registrationId);
+        return Result.ok(orders.doctorExams(registrationId, currentUser.doctorId(principal, null)));
+    }
+
+    @GetMapping("/prescriptions")
+    public Result<?> prescriptions(@RequestParam long registrationId,
+                                   @AuthenticationPrincipal AuthPrincipal principal) {
+        currentUser.assertDoctorOwnsRegistration(principal, registrationId);
+        return Result.ok(orders.doctorPrescriptions(registrationId, currentUser.doctorId(principal, null)));
     }
 }

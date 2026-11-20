@@ -6,9 +6,11 @@ import com.hospital.v2.dao.Db;
 import com.hospital.v2.service.DashboardService;
 import com.hospital.v2.service.KnowledgeService;
 import com.hospital.v2.service.ManualReviewService;
+import com.hospital.v2.service.PaymentService;
 import com.hospital.v2.service.ToolCenter;
 import com.hospital.v2.service.UsageService;
 import com.hospital.v2.security.AuthPrincipal;
+import com.hospital.v2.security.SensitiveDataCrypto;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -30,10 +32,12 @@ public class AdminController {
     private final ManualReviewService manualReviews;
     private final Db db;
     private final PasswordEncoder passwords;
+    private final PaymentService payments;
+    private final SensitiveDataCrypto crypto;
 
     public AdminController(ToolCenter tools, KnowledgeService knowledge,
                            DashboardService dashboard, UsageService usage, ManualReviewService manualReviews, Db db,
-                           PasswordEncoder passwords) {
+                           PasswordEncoder passwords, PaymentService payments, SensitiveDataCrypto crypto) {
         this.tools = tools;
         this.knowledge = knowledge;
         this.dashboard = dashboard;
@@ -41,6 +45,8 @@ public class AdminController {
         this.manualReviews = manualReviews;
         this.db = db;
         this.passwords = passwords;
+        this.payments = payments;
+        this.crypto = crypto;
     }
 
     // ---- 工具中心 ----
@@ -250,12 +256,20 @@ public class AdminController {
     @PostMapping("/patients/save")
     public Result<?> patientSave(@RequestBody Map<String, Object> body) {
         Long id = body.get("id") == null ? null : Long.valueOf(String.valueOf(body.get("id")));
+        Map<String, Object> safe = new LinkedHashMap<>(body);
+        protectSensitiveFields(body, safe);
+        safe.putIfAbsent("phone", null);
+        safe.putIfAbsent("id_card", null);
+        safe.putIfAbsent("id_card_hash", null);
         if (id == null) {
-            return Result.ok(Map.of("id", db.insert("INSERT INTO patient_profile (name, gender, age, allergic_history, past_history) "
-                    + "VALUES (:name,:gender,:age,:allergic_history,:past_history)", body)));
+            return Result.ok(Map.of("id", db.insert("INSERT INTO patient_profile (name, gender, age, allergic_history, past_history, phone, id_card, id_card_hash) "
+                    + "VALUES (:name,:gender,:age,:allergic_history,:past_history,:phone,:id_card,:id_card_hash)", safe)));
         }
-        db.update("UPDATE patient_profile SET name=:name, gender=:gender, age=:age, allergic_history=:allergic_history, "
-                + "past_history=:past_history WHERE id=:id", body);
+        String sql = "UPDATE patient_profile SET name=:name, gender=:gender, age=:age, allergic_history=:allergic_history, "
+                + "past_history=:past_history";
+        if (safe.containsKey("phone")) sql += ", phone=:phone";
+        if (safe.containsKey("id_card")) sql += ", id_card=:id_card, id_card_hash=:id_card_hash";
+        db.update(sql + " WHERE id=:id", safe);
         return Result.ok();
     }
 
@@ -326,7 +340,38 @@ public class AdminController {
     }
 
     @GetMapping("/patients")
-    public Result<?> patients() { return Result.ok(db.query("SELECT * FROM patient_profile ORDER BY id", Map.of())); }
+    public Result<?> patients() {
+        List<Map<String, Object>> rows = db.query("SELECT * FROM patient_profile ORDER BY id", Map.of());
+        rows.forEach(this::maskSensitiveFields);
+        return Result.ok(rows);
+    }
+
+    private void protectSensitiveFields(Map<String, Object> source, Map<String, Object> target) {
+        String phone = plainSensitive(source.get("phone"));
+        if (phone != null) target.put("phone", crypto.encrypt(phone));
+        String idCard = plainSensitive(source.get("id_card"));
+        if (idCard != null) {
+            target.put("id_card", crypto.encrypt(idCard));
+            target.put("id_card_hash", crypto.sha256(idCard));
+        }
+    }
+
+    private void maskSensitiveFields(Map<String, Object> row) {
+        row.put("phone", crypto.maskPhone(textOrNull(row.get("phone"))));
+        row.put("id_card", crypto.maskIdCard(textOrNull(row.get("id_card"))));
+        row.remove("id_card_hash");
+    }
+
+    private String plainSensitive(Object value) {
+        String text = textOrNull(value);
+        return text == null || text.contains("*") ? null : text;
+    }
+
+    private String textOrNull(Object value) {
+        if (value == null) return null;
+        String text = String.valueOf(value).trim();
+        return text.isBlank() || "null".equalsIgnoreCase(text) ? null : text;
+    }
 
     // ---- AI 模型配置：保存 + 连通性测试 ----
     @PostMapping("/ai-models/save")
@@ -426,5 +471,18 @@ public class AdminController {
                         + "LEFT JOIN doctor_schedule s ON s.doctor_id=d.id "
                         + "GROUP BY d.id, d.name, d.title, dep.name ORDER BY regs DESC, d.id", Map.of()));
         return Result.ok(m);
+    }
+
+    @GetMapping("/revenue")
+    public Result<?> revenue(@RequestParam(defaultValue = "daily") String period,
+                             @RequestParam String start, @RequestParam String end) {
+        return Result.ok(payments.getRevenueStats(period, start, end));
+    }
+
+    @PostMapping("/payment/refund")
+    public Result<?> refund(@RequestBody Map<String, Object> body) {
+        long billId = Long.parseLong(String.valueOf(body.get("billId")));
+        payments.refundBill(billId, String.valueOf(body.getOrDefault("reason", "管理员退费")));
+        return Result.ok();
     }
 }

@@ -74,6 +74,9 @@ INSERT INTO patient_profile (id, user_id, name, gender, age, allergic_history, p
     (5, NULL, '陈果果', '男', 7,  '尘螨过敏',   '反复喘息发作 2 年，过敏性鼻炎'),
     (6, NULL, '赵国庆', '男', 71, '', '冠心病 PCI 术后 3 年、慢性支气管炎');
 
+-- 患者演示余额：仅用于本地支付闭环演示，生产环境不得使用固定余额。
+UPDATE patient_profile SET balance=100.00 WHERE id IN (1, 2);
+
 -- 6. 症状标签（20 个，细粒度）
 INSERT INTO symptom_tag (id, name, department_id, description) VALUES
     (1,  '咳嗽咳痰',     1,  '呼吸道症状：干咳、湿咳、痰量与性状'),

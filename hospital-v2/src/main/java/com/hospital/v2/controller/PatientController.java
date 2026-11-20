@@ -7,8 +7,10 @@ import com.hospital.v2.service.MedicalRecordService;
 import com.hospital.v2.service.PreTriageService;
 import com.hospital.v2.service.ReActTriageAgent;
 import com.hospital.v2.service.RegistrationService;
+import com.hospital.v2.service.ClinicalOrderService;
 import com.hospital.v2.security.AuthPrincipal;
 import com.hospital.v2.security.CurrentUserService;
+import com.hospital.v2.security.SensitiveDataCrypto;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -31,11 +33,14 @@ public class PatientController {
     private final com.hospital.v2.dao.Db db;
     private final CurrentUserService currentUser;
     private final com.hospital.v2.service.ManualReviewService manualReviews;
+    private final SensitiveDataCrypto crypto;
+    private final ClinicalOrderService orders;
 
     public PatientController(PreTriageService preTriage, ReActTriageAgent agent,
                              RegistrationService registration, MedicalRecordService records,
                              com.hospital.v2.dao.Db db, CurrentUserService currentUser,
-                             com.hospital.v2.service.ManualReviewService manualReviews) {
+                             com.hospital.v2.service.ManualReviewService manualReviews,
+                             SensitiveDataCrypto crypto, ClinicalOrderService orders) {
         this.preTriage = preTriage;
         this.agent = agent;
         this.registration = registration;
@@ -43,6 +48,8 @@ public class PatientController {
         this.db = db;
         this.currentUser = currentUser;
         this.manualReviews = manualReviews;
+        this.crypto = crypto;
+        this.orders = orders;
     }
 
     @PostMapping("/session")
@@ -206,6 +213,18 @@ public class PatientController {
         return Result.ok(records.myRecords(currentUser.patientId(principal, patientId)));
     }
 
+    @GetMapping("/exam-orders")
+    public Result<?> examOrders(@RequestParam(required = false) Long patientId,
+                                @AuthenticationPrincipal AuthPrincipal principal) {
+        return Result.ok(orders.patientExams(currentUser.patientId(principal, patientId)));
+    }
+
+    @GetMapping("/prescriptions")
+    public Result<?> prescriptions(@RequestParam(required = false) Long patientId,
+                                   @AuthenticationPrincipal AuthPrincipal principal) {
+        return Result.ok(orders.patientPrescriptions(currentUser.patientId(principal, patientId)));
+    }
+
     @GetMapping("/record/detail")
     public Result<?> recordDetail(@RequestParam long recordId,
                                   @AuthenticationPrincipal AuthPrincipal principal) {
@@ -218,7 +237,10 @@ public class PatientController {
     public Result<?> profile(@RequestParam(required = false) Long patientId,
                              @AuthenticationPrincipal AuthPrincipal principal) {
         long ownPatientId = currentUser.patientId(principal, patientId);
-        return Result.ok(db.queryOne("SELECT * FROM patient_profile WHERE id=:id", Map.of("id", ownPatientId)));
+        Map<String, Object> row = db.queryOne("SELECT * FROM patient_profile WHERE id=:id", Map.of("id", ownPatientId));
+        if (row == null) throw new BizException("患者档案不存在");
+        maskSensitiveFields(row);
+        return Result.ok(row);
     }
 
     @PostMapping("/profile/save")
@@ -228,9 +250,38 @@ public class PatientController {
         long id = currentUser.patientId(principal, requested);
         Map<String, Object> safe = new LinkedHashMap<>(body);
         safe.put("id", id);
-        db.update("UPDATE patient_profile SET name=:name, gender=:gender, age=:age, "
-                + "allergic_history=:allergic_history, past_history=:past_history WHERE id=:id", safe);
+        String phone = plainSensitive(body.get("phone"));
+        String idCard = plainSensitive(body.get("id_card"));
+        if (phone != null) {
+            safe.put("phone", crypto.encrypt(phone));
+        }
+        if (idCard != null) {
+            safe.put("id_card", crypto.encrypt(idCard));
+            safe.put("id_card_hash", crypto.sha256(idCard));
+        }
+        String sql = "UPDATE patient_profile SET name=:name, gender=:gender, age=:age, "
+                + "allergic_history=:allergic_history, past_history=:past_history";
+        if (phone != null) sql += ", phone=:phone";
+        if (idCard != null) sql += ", id_card=:id_card, id_card_hash=:id_card_hash";
+        db.update(sql + " WHERE id=:id", safe);
         return Result.ok();
+    }
+
+    private void maskSensitiveFields(Map<String, Object> row) {
+        row.put("phone", crypto.maskPhone(textOrNull(row.get("phone"))));
+        row.put("id_card", crypto.maskIdCard(textOrNull(row.get("id_card"))));
+        row.remove("id_card_hash");
+    }
+
+    private String plainSensitive(Object value) {
+        String text = textOrNull(value);
+        return text == null || text.contains("*") ? null : text;
+    }
+
+    private String textOrNull(Object value) {
+        if (value == null) return null;
+        String text = String.valueOf(value).trim();
+        return text.isBlank() || "null".equalsIgnoreCase(text) ? null : text;
     }
 
     private List<String> chunk(String text) {

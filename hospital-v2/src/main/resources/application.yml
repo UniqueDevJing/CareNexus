@@ -30,7 +30,11 @@ hospital:
     # 生产必须用环境变量覆盖；默认值仅用于本地 H2 演示。
     jwt-secret: ${AUTH_JWT_SECRET:carenexus-hospital-v2-local-only-secret-change-me}
     token-hours: ${AUTH_TOKEN_HOURS:8}
+    refresh-days: ${AUTH_REFRESH_DAYS:30}
     cookie-secure: ${AUTH_COOKIE_SECURE:false}
+  crypto:
+    # 仅本地 H2 演示默认值；mysql profile 必须由 CARENEXUS_AES_KEY 注入。
+    aes-key: ${CARENEXUS_AES_KEY:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
   llm:
     # 不配置 key 时走确定性离线 Mock（仍可跑通 ReAct 循环与工具调用，用于本地验证）
     mode: ${LLM_MODE:auto}            # auto | real | mock

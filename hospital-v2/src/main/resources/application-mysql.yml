@@ -13,8 +13,11 @@ spring:
 hospital:
   auth:
     jwt-secret: ${AUTH_JWT_SECRET}
+    refresh-days: ${AUTH_REFRESH_DAYS:30}
     # Production profile must receive an explicit protocol decision from the environment.
     cookie-secure: ${AUTH_COOKIE_SECURE}
+  crypto:
+    aes-key: ${CARENEXUS_AES_KEY}
   llm:
     mode: ${LLM_MODE:real}
     base-url: ${LLM_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
