@@ -6,15 +6,16 @@
     <aside class="sidebar" aria-label="主导航">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true"><i></i></span>
-        <div>
+        <div class="brand-copy">
           <b>CareNexus</b>
           <small>就诊服务工作台</small>
         </div>
       </div>
 
       <div class="nav-context">
-        <span>{{ roleLabel }}</span>
-        <strong>{{ user.name || user.username }}</strong>
+        <span>当前工作身份</span>
+        <strong>{{ roleLabel }}</strong>
+        <small>{{ user.name || user.username }}</small>
       </div>
       <template v-if="role==='admin'">
         <div class="nav-section">运营中心</div>
@@ -49,7 +50,7 @@
         <span class="tag">{{ r.meta.tag }}</span>
       </router-link>
       <div class="sidebar-foot">
-        <span>Secure session</span>
+        <span><i aria-hidden="true"></i>安全会话</span>
         <button class="logout-button" @click="logout">退出登录</button>
       </div>
     </aside>
@@ -60,14 +61,14 @@
           <span></span><span></span>
         </button>
         <div class="page-head">
-          <span class="page-kicker">{{ roleLabel }}</span>
+          <span class="page-kicker">CareNexus / {{ roleLabel }}</span>
           <h1>{{ currentTitle }}</h1>
         </div>
         <div class="topbar-session">
           <span class="topbar-date">{{ todayLabel }}</span>
           <span class="session-state"><i aria-hidden="true"></i>{{ sessionLabel }}</span>
           <div class="user-chip">
-            <span class="user-avatar">{{ userInitial }}</span>
+            <span class="user-avatar role-avatar" :data-role="role">{{ roleAvatar }}</span>
             <div><strong>{{ user.name || user.username }}</strong><small>{{ roleLabel }}</small></div>
           </div>
         </div>
@@ -110,7 +111,7 @@ const user = computed(() => {
 const role = computed(() => user.value.role)
 const roleLabel = computed(() => ({ admin: '运营管理', nurse: '护士导诊', doctor: '医生接诊', patient: '患者服务' }[role.value] || '工作台'))
 const sessionLabel = computed(() => ({ admin: '运营数据已同步', nurse: '导诊队列已保护', doctor: '临床会话安全', patient: '隐私连接已保护' }[role.value] || '安全会话'))
-const userInitial = computed(() => (user.value.name || user.value.username || 'U').slice(0, 1).toUpperCase())
+const roleAvatar = computed(() => ({ admin: '运', nurse: '导', doctor: '医', patient: '患' }[role.value] || 'U'))
 const currentTitle = computed(() => (route.meta && route.meta.title) || '智慧医院')
 const todayLabel = new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' }).format(new Date())
 let motion

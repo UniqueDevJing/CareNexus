@@ -1,45 +1,70 @@
 <template>
   <main ref="page" class="login-page">
-    <div class="login-bg-grid" aria-hidden="true"></div>
-    <div class="login-orbit login-orbit--one" aria-hidden="true"></div>
-    <div class="login-orbit login-orbit--two" aria-hidden="true"></div>
-    <section class="login-stage" aria-labelledby="login-title">
-      <div class="login-intro" data-enter>
+    <section class="login-story" aria-labelledby="login-story-title">
+      <div class="login-story-top">
         <div class="login-brand">
           <span class="brand-mark" aria-hidden="true"><i></i></span>
           <span>CareNexus</span>
         </div>
-        <p class="login-kicker">患者 · 护士 · 医生 · 运营</p>
-        <h1 id="login-title">就诊服务工作台</h1>
-        <p>患者先把情况说清楚，医生在完整背景里接诊，运营人员看见每一次转接和确认。</p>
-        <p class="login-contest-entry"><router-link to="/contest">查看 SafePath 产品演示 →</router-link></p>
+        <span class="login-location">门诊服务中心 · 2026</span>
       </div>
 
-      <section class="login-panel" data-enter aria-label="身份认证">
-        <div class="login-card">
-          <div class="login-card-head">
-            <span class="status-dot"></span>
-            <div><h2>{{ mode === 'login' ? '进入工作台' : '创建患者账号' }}</h2><p>不同身份看到各自需要的就诊信息</p></div>
-          </div>
-          <el-tabs v-model="mode" stretch>
-            <el-tab-pane label="登录" name="login" />
-            <el-tab-pane label="患者注册" name="register" />
-          </el-tabs>
-          <el-form label-position="top" @submit.prevent="submit">
-            <el-form-item label="用户名"><el-input v-model="form.username" autocomplete="username" placeholder="输入用户名" /></el-form-item>
-            <el-form-item label="密码"><el-input v-model="form.password" type="password" autocomplete="current-password" show-password placeholder="输入密码" /></el-form-item>
-            <template v-if="mode==='register'">
-              <el-form-item label="姓名"><el-input v-model="form.name" autocomplete="name" placeholder="输入真实姓名" /></el-form-item>
-              <el-form-item label="手机号（可选）"><el-input v-model="form.phone" autocomplete="tel" placeholder="用于就诊联系" /></el-form-item>
-            </template>
-            <el-button type="primary" native-type="submit" :loading="loading" class="login-submit">
-              {{ mode==='login' ? '进入工作台' : '创建并进入' }}
-            </el-button>
-          </el-form>
-          <div v-if="showDemoAccounts" class="demo-accounts"><span>本地演示账号</span><code>admin</code><code>nurse</code><code>doctor</code><code>patient</code><small>仅开发环境可用</small></div>
+      <div class="login-story-main" data-enter>
+        <span class="login-kicker">一条完整的就诊链路</span>
+        <h1 id="login-story-title">先听见患者，<br><em>再开始治疗。</em></h1>
+        <p>把患者的描述、护士的判断、医生的记录放在同一条可追溯的就诊路径里。</p>
+      </div>
+
+      <div class="clinical-poster" aria-label="CareNexus 就诊链路示意">
+        <div class="poster-heading"><span>就诊路径</span><strong>CARE PATH 01</strong></div>
+        <div class="poster-line" aria-hidden="true"><i></i><b></b><i></i><b></b><i></i></div>
+        <div class="poster-steps">
+          <span><b>01</b><strong>患者描述</strong><small>先把不适说清楚</small></span>
+          <span><b>02</b><strong>护士核对</strong><small>需要人判断时接手</small></span>
+          <span><b>03</b><strong>医生接诊</strong><small>形成结构化病历</small></span>
         </div>
-      </section>
-      <p class="security-note">JWT 安全会话 · 角色权限隔离 · 医疗数据归属校验</p>
+        <div class="poster-footer"><span><i></i> 今日门诊路径已准备</span><small>隐私保护 · 权限隔离 · 全程留痕</small></div>
+      </div>
+
+      <div class="login-story-bottom"><span>Care before code.</span><span>© CareNexus</span></div>
+    </section>
+
+    <section class="login-panel" data-enter aria-label="身份认证">
+      <div class="login-panel-inner">
+        <div class="login-panel-heading">
+          <span class="login-panel-label">进入门诊工作台</span>
+          <h2>{{ mode === 'login' ? '欢迎回来' : '建立患者档案' }}</h2>
+          <p>{{ mode === 'login' ? '请选择你的工作身份，继续今天的就诊流程。' : '创建账号后，可以保存健康档案和就诊记录。' }}</p>
+        </div>
+
+        <div class="identity-strip" aria-label="支持的工作身份">
+          <span><i class="identity-dot identity-dot--patient">患</i>患者</span>
+          <span><i class="identity-dot identity-dot--nurse">导</i>护士</span>
+          <span><i class="identity-dot identity-dot--doctor">医</i>医生</span>
+          <span><i class="identity-dot identity-dot--admin">运</i>运营</span>
+        </div>
+
+        <div class="login-tabs" role="tablist" aria-label="登录或注册">
+          <button :class="{ active: mode === 'login' }" role="tab" :aria-selected="mode === 'login'" @click="mode = 'login'">登录工作台</button>
+          <button :class="{ active: mode === 'register' }" role="tab" :aria-selected="mode === 'register'" @click="mode = 'register'">患者注册</button>
+        </div>
+
+        <form class="login-form" @submit.prevent="submit">
+          <label>用户名<input v-model="form.username" autocomplete="username" placeholder="输入用户名" required></label>
+          <label>密码<div class="password-field"><input v-model="form.password" type="password" autocomplete="current-password" placeholder="输入密码" required></div></label>
+          <template v-if="mode === 'register'">
+            <label>姓名<input v-model="form.name" autocomplete="name" placeholder="输入真实姓名" required></label>
+            <label>手机号（可选）<input v-model="form.phone" autocomplete="tel" placeholder="用于就诊联系"></label>
+          </template>
+          <button class="login-submit" type="submit" :disabled="loading">
+            <span>{{ loading ? '正在验证…' : mode === 'login' ? '进入我的工作台' : '创建患者账号' }}</span>
+            <b aria-hidden="true">→</b>
+          </button>
+        </form>
+
+        <div v-if="showDemoAccounts" class="demo-accounts"><span>本地演示账号</span><code>admin</code><code>nurse</code><code>doctor</code><code>patient</code><small>仅开发环境可用</small></div>
+        <p class="login-privacy"><i aria-hidden="true"></i> 医疗信息仅在对应角色权限范围内可见</p>
+      </div>
     </section>
   </main>
 </template>
@@ -63,9 +88,7 @@ onMounted(() => {
   motion = gsap.matchMedia()
   motion.add('(prefers-reduced-motion: no-preference)', () => {
     const targets = gsap.utils.toArray('[data-enter]', page.value)
-    if (!targets.length) return
-    gsap.fromTo(targets, { autoAlpha: 0, y: 18 },
-      { autoAlpha: 1, y: 0, duration: 0.72, stagger: 0.1, ease: 'power3.out', clearProps: 'all' })
+    gsap.fromTo(targets, { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.62, stagger: 0.08, ease: 'power2.out', clearProps: 'all' })
   }, page.value)
 })
 onUnmounted(() => motion?.revert())
@@ -76,9 +99,9 @@ async function submit() {
     const user = await api.post(`/auth/${mode.value}`, null, form)
     const { token: _token, ...safeUser } = user
     localStorage.setItem('hospital_user', JSON.stringify(safeUser))
-    ElMessage.success('登录成功')
+    ElMessage.success(mode.value === 'login' ? '已进入工作台' : '患者档案已建立')
     router.replace(user.role === 'admin' ? '/admin/dashboard' : user.role === 'nurse' ? '/nurse/triage' : user.role === 'doctor' ? '/doctor/console' : '/patient/pre')
-  } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '操作失败') }
+  } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '操作失败，请检查账号信息') }
   finally { loading.value = false }
 }
 </script>
