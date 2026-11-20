@@ -17,21 +17,25 @@
         <strong>{{ user.name || user.username }}</strong>
       </div>
       <template v-if="role==='admin'">
-        <div class="nav-section">基础数据管理</div>
-        <router-link v-for="r in adminGroups.base" :key="r.path" :to="r.path" class="nav-item" :class="{ active: $route.path === r.path }" @click="navOpen = false"><span>{{ r.title }}</span><span class="tag">{{ r.tag }}</span></router-link>
-        <div class="nav-section">模型与策略</div>
-        <router-link v-for="r in adminGroups.ai" :key="r.path" :to="r.path" class="nav-item" :class="{ active: $route.path === r.path }" @click="navOpen = false"><span>{{ r.title }}</span><span class="tag">{{ r.tag }}</span></router-link>
-        <div class="nav-section">医学知识库</div>
-        <router-link v-for="r in adminGroups.rag" :key="r.path" :to="r.path" class="nav-item" :class="{ active: $route.path === r.path }" @click="navOpen = false"><span>{{ r.title }}</span><span class="tag">{{ r.tag }}</span></router-link>
-        <div class="nav-section">外部工具与审计</div>
-        <router-link v-for="r in adminGroups.agent" :key="r.path" :to="r.path" class="nav-item" :class="{ active: $route.path === r.path }" @click="navOpen = false"><span>{{ r.title }}</span><span class="tag">{{ r.tag }}</span></router-link>
-        <div class="nav-section">运营与审计</div>
+        <div class="nav-section">运营中心</div>
         <router-link v-for="r in adminGroups.ops" :key="r.path" :to="r.path" class="nav-item" :class="{ active: $route.path === r.path }" @click="navOpen = false"><span>{{ r.title }}</span><span class="tag">{{ r.tag }}</span></router-link>
+        <div class="nav-section">业务配置</div>
+        <router-link v-for="r in adminGroups.base" :key="r.path" :to="r.path" class="nav-item" :class="{ active: $route.path === r.path }" @click="navOpen = false"><span>{{ r.title }}</span><span class="tag">{{ r.tag }}</span></router-link>
+        <div class="nav-section">智能能力</div>
+        <router-link v-for="r in adminGroups.ai.concat(adminGroups.rag, adminGroups.agent)" :key="r.path" :to="r.path" class="nav-item" :class="{ active: $route.path === r.path }" @click="navOpen = false"><span>{{ r.title }}</span><span class="tag">{{ r.tag }}</span></router-link>
       </template>
 
       <div v-if="role==='doctor'" class="nav-section">医生工作区</div>
       <router-link v-for="r in doctorRoutes" :key="r.path" :to="r.path" class="nav-item"
                    v-show="role==='doctor'"
+                   :class="{ active: $route.path === r.path }" @click="navOpen = false">
+        <span>{{ r.meta.title }}</span>
+        <span class="tag">{{ r.meta.tag }}</span>
+      </router-link>
+
+      <div v-if="role==='nurse'" class="nav-section">护士工作区</div>
+      <router-link v-for="r in nurseRoutes" :key="r.path" :to="r.path" class="nav-item"
+                   v-show="role==='nurse'"
                    :class="{ active: $route.path === r.path }" @click="navOpen = false">
         <span>{{ r.meta.title }}</span>
         <span class="tag">{{ r.meta.tag }}</span>
@@ -60,6 +64,7 @@
           <h1>{{ currentTitle }}</h1>
         </div>
         <div class="topbar-session">
+          <span class="topbar-date">{{ todayLabel }}</span>
           <span class="session-state"><i aria-hidden="true"></i>{{ sessionLabel }}</span>
           <div class="user-chip">
             <span class="user-avatar">{{ userInitial }}</span>
@@ -84,6 +89,7 @@ const routes = router.options.routes
 const adminRoutes = routes.filter(r => r.meta && r.meta.group === 'admin')
 const doctorRoutes = routes.filter(r => r.meta && r.meta.group === 'doctor')
 const patientRoutes = routes.filter(r => r.meta && r.meta.group === 'patient')
+const nurseRoutes = routes.filter(r => r.meta && r.meta.group === 'nurse')
 const adminGroups = {
   base: [{ path: '/admin/basedata', title: '基础数据总览', tag: 'CRUD' }, { path: '/admin/symptoms', title: '症状标签库', tag: 'RULE' }],
   ai: [{ path: '/admin/aiconfig', title: '模型与策略', tag: 'MODEL' }, { path: '/admin/prompts', title: '提示模板', tag: 'TEXT' }],
@@ -102,10 +108,11 @@ const user = computed(() => {
   return JSON.parse(localStorage.getItem('hospital_user') || '{}')
 })
 const role = computed(() => user.value.role)
-const roleLabel = computed(() => ({ admin: '运营管理', doctor: '医生接诊', patient: '患者服务' }[role.value] || '工作台'))
-const sessionLabel = computed(() => ({ admin: '运营数据已同步', doctor: '临床会话安全', patient: '隐私连接已保护' }[role.value] || '安全会话'))
+const roleLabel = computed(() => ({ admin: '运营管理', nurse: '护士导诊', doctor: '医生接诊', patient: '患者服务' }[role.value] || '工作台'))
+const sessionLabel = computed(() => ({ admin: '运营数据已同步', nurse: '导诊队列已保护', doctor: '临床会话安全', patient: '隐私连接已保护' }[role.value] || '安全会话'))
 const userInitial = computed(() => (user.value.name || user.value.username || 'U').slice(0, 1).toUpperCase())
 const currentTitle = computed(() => (route.meta && route.meta.title) || '智慧医院')
+const todayLabel = new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' }).format(new Date())
 let motion
 
 function animateRoute() {

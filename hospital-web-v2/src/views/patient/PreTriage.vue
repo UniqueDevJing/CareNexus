@@ -1,22 +1,29 @@
 <template>
   <section class="workspace patient-journey" aria-label="智能预问诊工作区">
-    <section class="journey-head">
-      <div><span class="eyebrow">预问诊</span><h2>先说说哪里不舒服。</h2><p>我们会补充必要信息，再给出就诊方向。建议不会替代医生诊断。</p></div>
-      <div class="journey-steps">
-        <span class="done"><i>1</i>健康档案</span><b></b><span :class="{ active: sessionId }"><i>2</i>症状沟通</span><b></b><span :class="{ active: suggested }"><i>3</i>就诊建议</span>
+    <section class="service-header">
+      <div>
+        <span class="eyebrow">就诊准备 / 01</span>
+        <h2>先把这次不舒服说清楚。</h2>
+        <p>用 3–5 分钟补充症状和健康背景，我们会把结果交给合适的医生判断。</p>
       </div>
+      <div class="service-meta"><span><i></i>隐私连接已保护</span><span>建议不替代诊断</span></div>
+    </section>
+
+    <section class="journey-steps journey-steps--bar" aria-label="就诊准备进度">
+      <span class="done"><i>1</i><b>健康档案</b><small>已准备</small></span><b></b><span :class="{ active: sessionId }"><i>2</i><b>症状沟通</b><small>{{ sessionId ? '进行中' : '待开始' }}</small></span><b></b><span :class="{ active: suggested }"><i>3</i><b>就诊建议</b><small>{{ suggested ? '已生成' : '完成沟通后' }}</small></span>
     </section>
 
     <section class="consultation-shell">
       <article class="conversation-panel">
         <header class="conversation-head">
-            <div class="agent-identity"><span class="agent-symbol">C</span><div><b>CareNexus 预问诊</b><small><i></i>{{ sessionId ? `会话 #${sessionId} 已建立` : '等待开始会话' }}</small></div></div>
+          <div class="agent-identity"><span class="agent-symbol">01</span><div><b>症状沟通</b><small><i></i>{{ sessionId ? `会话 #${sessionId} 已建立` : '还没有开始本次就诊' }}</small></div></div>
           <button class="secondary-button" @click="start">{{ sessionId ? '重新开始' : '开始预问诊' }}</button>
         </header>
 
         <div ref="box" class="conversation-stream">
           <div v-if="!msgs.length" class="conversation-welcome">
-            <span class="welcome-mark">+</span><h3>我会用几轮对话了解你的情况</h3><p>建议描述症状出现的时间、部位、程度，以及是否伴随发热、胸闷等情况。</p>
+            <div class="welcome-copy"><span class="welcome-mark">+</span><div><span class="eyebrow">从一句话开始</span><h3>最困扰你的症状是什么？</h3><p>可以先说部位、出现时间、严重程度，以及有没有发热、胸闷或其他变化。</p></div></div>
+            <div class="starter-prompts"><button type="button" @click="input = '我从昨晚开始胸闷，活动后更明显'">胸闷 / 呼吸不适</button><button type="button" @click="input = '这两天一直发热，伴有咳嗽'">发热 / 咳嗽</button><button type="button" @click="input = '我最近反复胃痛，饭后更明显'">腹痛 / 消化不适</button></div>
             <button v-if="!sessionId" class="primary-button" @click="start">开始安全预问诊</button>
           </div>
           <div v-for="(m, i) in msgs" :key="i" :class="['message-row', m.role]">
@@ -44,8 +51,9 @@
         </article>
 
         <article v-else class="safety-card">
-          <span class="shield-mark">✦</span><div><b>三重安全校验</b><p>红旗征象识别、工具数据核验、规则引擎复核，在生成建议前依次执行。</p></div>
-          <ul><li>危急情况自动转急诊</li><li>结合慢病与过敏信息</li><li>建议过程全链路可追踪</li></ul>
+          <div class="safety-heading"><span class="shield-mark">✓</span><div><span class="eyebrow">安全边界</span><b>每一步都有人和规则兜底</b></div></div>
+          <p>系统只负责整理信息和匹配就诊资源，不替代医生诊断。</p>
+          <ul><li>发现危急征象，优先提示急诊</li><li>信息不足时，要求补充或转人工</li><li>建议生成过程可回看、可追踪</li></ul>
         </article>
 
         <details class="profile-card">
@@ -58,6 +66,8 @@
             <button class="primary-button primary-button--wide" :disabled="saving" @click="saveProfile">{{ saving ? '保存中…' : '保存健康档案' }}</button>
           </div>
         </details>
+
+        <article class="aside-note"><span class="eyebrow">就诊前准备</span><b>让医生更快了解你</b><p>请尽量准备既往病史、正在服用的药物和过敏信息。</p></article>
       </aside>
     </section>
   </section>

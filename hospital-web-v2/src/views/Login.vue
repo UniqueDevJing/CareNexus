@@ -9,7 +9,7 @@
           <span class="brand-mark" aria-hidden="true"><i></i></span>
           <span>CareNexus</span>
         </div>
-        <p class="login-kicker">患者 · 医生 · 运营</p>
+        <p class="login-kicker">患者 · 护士 · 医生 · 运营</p>
         <h1 id="login-title">就诊服务工作台</h1>
         <p>患者先把情况说清楚，医生在完整背景里接诊，运营人员看见每一次转接和确认。</p>
         <p class="login-contest-entry"><router-link to="/contest">查看 SafePath 产品演示 →</router-link></p>
@@ -36,7 +36,7 @@
               {{ mode==='login' ? '进入工作台' : '创建并进入' }}
             </el-button>
           </el-form>
-          <div v-if="showDemoAccounts" class="demo-accounts"><span>本地演示账号</span><code>admin</code><code>doctor</code><code>patient</code><small>仅开发环境可用</small></div>
+          <div v-if="showDemoAccounts" class="demo-accounts"><span>本地演示账号</span><code>admin</code><code>nurse</code><code>doctor</code><code>patient</code><small>仅开发环境可用</small></div>
         </div>
       </section>
       <p class="security-note">JWT 安全会话 · 角色权限隔离 · 医疗数据归属校验</p>
@@ -77,7 +77,7 @@ async function submit() {
     const { token: _token, ...safeUser } = user
     localStorage.setItem('hospital_user', JSON.stringify(safeUser))
     ElMessage.success('登录成功')
-    router.replace(user.role === 'admin' ? '/admin/dashboard' : user.role === 'doctor' ? '/doctor/console' : '/patient/pre')
+    router.replace(user.role === 'admin' ? '/admin/dashboard' : user.role === 'nurse' ? '/nurse/triage' : user.role === 'doctor' ? '/doctor/console' : '/patient/pre')
   } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '操作失败') }
   finally { loading.value = false }
 }

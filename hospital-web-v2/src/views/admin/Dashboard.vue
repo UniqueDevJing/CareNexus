@@ -1,34 +1,25 @@
 <template>
   <section class="workspace command-center" aria-label="运营看板工作区">
-    <section class="workspace-hero workspace-hero--dark">
-      <div>
-        <span class="eyebrow">CARENEXUS / 就诊运营</span>
-        <h2>把每一次转接<br>留在记录里。</h2>
-        <p>从患者描述到医生接诊，统一查看风险拦截、人工确认和号源使用情况。</p>
-      </div>
-      <div class="system-pulse">
-        <span class="pulse-orbit"><i></i></span>
-        <div><strong>系统运行中</strong><small>{{ ov.doctorOnline || 0 }} 位医生在线 · {{ runs.length }} 条执行轨迹</small></div>
-      </div>
+    <section class="work-header ops-header">
+      <div><span class="eyebrow">运营中心 / 实时状态</span><h2>今天的就诊链路，哪里需要你介入？</h2><p>优先处理低证据、危急征象和号源异常；其余流程保持自动运行并留下可审计记录。</p></div>
+      <div class="work-header-actions"><span class="ops-health"><i></i><strong>系统运行中</strong><small>{{ ov.doctorOnline || 0 }} 位医生在线</small></span><button class="secondary-button" @click="load">刷新数据</button></div>
     </section>
 
     <section class="metric-grid metric-grid--four" aria-label="运营核心指标">
-      <article class="metric-tile"><span>分诊建议</span><strong>{{ ov.totalSuggestion || 0 }}</strong><small>累计生成的临床建议</small></article>
-      <article class="metric-tile"><span>转化命中率</span><strong>{{ ov.hitRate || 0 }}<em>%</em></strong><small>建议后完成挂号</small></article>
+      <article class="metric-tile"><span>今日分诊建议</span><strong>{{ ov.totalSuggestion || 0 }}</strong><small>已生成并可追踪</small></article>
+      <article class="metric-tile"><span>建议转挂号</span><strong>{{ ov.hitRate || 0 }}<em>%</em></strong><small>建议后完成挂号</small></article>
       <article class="metric-tile"><span>号源使用率</span><strong>{{ enh.slotUsage || '0%' }}</strong><small>{{ enh.registrations || 0 }} 次有效挂号</small></article>
-      <article class="metric-tile" :class="{ 'metric-tile--alert': ov.redFlag }"><span>安全硬拦截</span><strong>{{ ov.redFlag || 0 }}</strong><small>{{ ov.pendingTriage || 0 }} 个会话待分诊</small></article>
+      <article class="metric-tile" :class="{ 'metric-tile--alert': ov.redFlag || manualReviews.length }"><span>需要人工介入</span><strong>{{ manualReviews.length + Number(ov.redFlag || 0) }}</strong><small>{{ ov.pendingTriage || 0 }} 个会话待分诊</small></article>
     </section>
 
     <section class="surface review-panel" v-if="manualReviews.length">
       <header class="panel-head"><div><span class="eyebrow">HUMAN REVIEW QUEUE</span><h3>待人工导诊</h3></div><span class="panel-note">低证据、异常或需人工确认的分诊</span></header>
       <div class="run-feed">
-        <article v-for="item in manualReviews" :key="item.suggestion_id" class="run-row">
+          <article v-for="item in manualReviews" :key="item.suggestion_id" class="review-row">
           <span class="run-state" :class="item.red_flag ? 'fail' : 'ok'"></span>
-          <code>#{{ item.suggestion_id }}</code>
-          <span>{{ item.patient_name || '患者' }} · {{ item.department_name || '待分诊' }}</span>
-          <span>{{ item.reason }}</span>
-          <button class="text-button" @click="resolveReview(item, 'REJECT')">转人工处理</button>
-          <button v-if="!item.red_flag" class="text-button" @click="resolveReview(item, 'CONFIRM')">确认建议</button>
+            <div><strong>#{{ item.suggestion_id }} · {{ item.patient_name || '患者' }}</strong><small>{{ item.department_name || '待分诊' }} · {{ item.reason }}</small></div>
+            <input v-model="reviewNotes[item.suggestion_id]" class="review-note" placeholder="填写处理依据（必填）" @keyup.enter="resolveReview(item, item.red_flag ? 'REJECT' : 'CONFIRM')">
+            <div class="review-actions"><button class="text-button" @click="resolveReview(item, 'REJECT')">转人工</button><button v-if="!item.red_flag" class="text-button" @click="resolveReview(item, 'CONFIRM')">确认建议</button></div>
         </article>
       </div>
     </section>
@@ -97,7 +88,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { api } from '../../api'
 
 const ov = ref({})
@@ -108,6 +99,7 @@ const manualReviews = ref([])
 const selected = ref(null)
 const timeline = ref([])
 const toolLogs = ref([])
+const reviewNotes = reactive({})
 
 function short(s) { if (!s) return '—'; return s.length > 60 ? s.slice(0, 60) + '…' : s }
 function capacity(d) { return d.slots ? Math.min(Math.round((d.used / d.slots) * 100), 100) : 0 }
@@ -119,13 +111,14 @@ async function load() {
   manualReviews.value = await api.get('/admin/dashboard/manual-review')
 }
 async function resolveReview(item, action) {
-  const note = window.prompt(action === 'CONFIRM' ? '请输入人工确认依据' : '请输入转人工原因', '')
-  if (note === null) return
+  const note = reviewNotes[item.suggestion_id]?.trim()
+  if (!note) return
   await api.post('/admin/triage/manual-review', null, {
     suggestionId: item.suggestion_id,
     action,
     note
   })
+  delete reviewNotes[item.suggestion_id]
   await load()
 }
 async function selectRun(runId) {

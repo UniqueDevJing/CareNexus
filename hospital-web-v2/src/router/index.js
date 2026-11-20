@@ -11,6 +11,7 @@ const AdminModule = () => import('../views/admin/AdminModule.vue')
 const PreTriage = () => import('../views/patient/PreTriage.vue')
 const Records = () => import('../views/patient/Records.vue')
 const DoctorConsole = () => import('../views/doctor/DoctorConsole.vue')
+const NurseTriage = () => import('../views/nurse/NurseTriage.vue')
 const Login = () => import('../views/Login.vue')
 
 const routes = [
@@ -30,6 +31,7 @@ const routes = [
   { path: '/admin/tools/logs', name: 'toolLogs', component: AdminModule, props: { mode: 'toolLogs' }, meta: { group: 'admin', title: '工具调用日志', tag: 'LOG' } },
   { path: '/admin/agent-runs', name: 'agentRuns', component: AdminModule, props: { mode: 'agentRuns' }, meta: { group: 'admin', title: 'Agent执行时间线', tag: 'TRACE' } },
   { path: '/doctor/console', name: 'doctorConsole', component: DoctorConsole, meta: { group: 'doctor', title: '门诊接诊台', tag: 'EMR' } },
+  { path: '/nurse/triage', name: 'nurseTriage', component: NurseTriage, meta: { group: 'nurse', title: '人工导诊台', tag: 'TRIAGE' } },
   { path: '/patient/pre', name: 'pre', component: PreTriage, meta: { group: 'patient', title: '智能预问诊', tag: 'SSE' } },
   { path: '/patient/records', name: 'records', component: Records, meta: { group: 'patient', title: '我的就诊', tag: 'EMR' } }
 ]
@@ -48,7 +50,7 @@ router.beforeEach(to => {
   if (!user) return '/login'
   const group = to.meta.group
   if (group && group !== user.role && user.role !== 'admin') {
-    return user.role === 'doctor' ? '/doctor/console' : '/patient/pre'
+    return user.role === 'doctor' ? '/doctor/console' : user.role === 'nurse' ? '/nurse/triage' : '/patient/pre'
   }
   return true
 })

@@ -10,7 +10,7 @@ CREATE TABLE user_account (
     username     VARCHAR(64)  NOT NULL,
     password     VARCHAR(128) NOT NULL,
     real_name    VARCHAR(32),
-    role         VARCHAR(16)  NOT NULL COMMENT 'admin|doctor|patient',
+    role         VARCHAR(16)  NOT NULL COMMENT 'admin|nurse|doctor|patient',
     phone        VARCHAR(20),
     id_card      VARCHAR(32),
     create_time  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,

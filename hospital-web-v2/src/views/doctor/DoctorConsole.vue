@@ -1,32 +1,32 @@
 <template>
   <section class="workspace doctor-workbench" aria-label="医生接诊工作区">
-    <section class="doctor-brief">
-      <div><span class="eyebrow">CLINICAL WORKSPACE</span><h2>{{ currentUser.name || currentUser.username }}医生，今天还有 {{ pendingCount }} 位患者。</h2><p>患者队列、健康背景与七段式病历集中在同一工作流中。</p></div>
-      <button class="secondary-button" @click="load">刷新队列</button>
+    <section class="work-header">
+      <div><span class="eyebrow">医生工作台 / 今日接诊</span><h2>{{ currentUser.name || currentUser.username }}，先处理最早到诊的患者。</h2><p>队列、风险提示和结构化病历放在同一张工作台上，提交后自动完成接诊。</p></div>
+      <div class="work-header-actions"><span class="queue-total"><strong>{{ pendingCount }}</strong> 位待接诊</span><button class="secondary-button" @click="load">刷新队列</button></div>
     </section>
 
     <section class="clinical-grid">
       <aside class="patient-queue surface">
-        <header class="panel-head"><div><span class="eyebrow">TODAY'S QUEUE</span><h3>今日接诊</h3></div><span class="queue-count">{{ regs.length }}</span></header>
-        <div class="queue-filter"><span class="active">全部</span><span>待接诊 {{ pendingCount }}</span><span>已完成 {{ regs.length - pendingCount }}</span></div>
+        <header class="panel-head"><div><span class="eyebrow">PATIENT QUEUE</span><h3>今日接诊</h3></div><span class="queue-count">{{ regs.length }}</span></header>
+        <div class="queue-filter" role="tablist" aria-label="患者状态筛选"><button :class="{ active: queueFilter === 'all' }" @click="queueFilter = 'all'">全部 <small>{{ regs.length }}</small></button><button :class="{ active: queueFilter === 'pending' }" @click="queueFilter = 'pending'">待接诊 <small>{{ pendingCount }}</small></button><button :class="{ active: queueFilter === 'done' }" @click="queueFilter = 'done'">已完成 <small>{{ regs.length - pendingCount }}</small></button></div>
         <div class="queue-list">
-          <button v-for="row in regs" :key="row.registration_id" :class="['patient-row', { active: emr.registrationId === row.registration_id }]" @click="openEmr(row)">
+          <button v-for="row in visibleRegs" :key="row.registration_id" :class="['patient-row', { active: emr.registrationId === row.registration_id }]" @click="openEmr(row)">
             <span class="patient-avatar">{{ (row.patient_name || '患').slice(0, 1) }}</span>
             <span class="patient-summary"><b>{{ row.patient_name }}</b><small>{{ row.gender }} · {{ row.age }} 岁 · {{ row.period }}</small></span>
             <span :class="['queue-status', row.status === 'DONE' ? 'done' : 'waiting']">{{ row.status === 'DONE' ? '已完成' : '待接诊' }}</span>
           </button>
-          <div v-if="!regs.length" class="empty-state"><span>✓</span><b>当前没有待诊患者</b><p>新挂号会自动进入这里。</p></div>
+          <div v-if="!visibleRegs.length" class="empty-state"><span>✓</span><b>{{ regs.length ? '这个筛选下暂无患者' : '当前没有待诊患者' }}</b><p>{{ regs.length ? '切换筛选查看完整队列。' : '新挂号会自动进入这里。' }}</p></div>
         </div>
       </aside>
 
       <article class="clinical-canvas surface">
         <template v-if="activePatient">
-          <header class="patient-hero">
+            <header class="patient-hero">
             <div class="patient-avatar patient-avatar--large">{{ (activePatient.patient_name || '患').slice(0, 1) }}</div>
             <div><span class="eyebrow">PATIENT / #{{ activePatient.registration_id }}</span><h3>{{ activePatient.patient_name }}</h3><p>{{ activePatient.gender }} · {{ activePatient.age }} 岁 · {{ activePatient.department }} · {{ activePatient.work_date }} {{ activePatient.period }}</p></div>
             <span :class="['queue-status', activePatient.status === 'DONE' ? 'done' : 'waiting']">{{ activePatient.status === 'DONE' ? '已结诊' : '接诊中' }}</span>
           </header>
-          <div class="clinical-alerts"><div><span>既往史</span><b>{{ activePatient.past_history || '无特殊记录' }}</b></div><div :class="{ alert: activePatient.allergic_history }"><span>过敏史</span><b>{{ activePatient.allergic_history || '无记录' }}</b></div></div>
+          <div class="clinical-alerts"><div><span>就诊背景</span><b>{{ activePatient.past_history || '暂无既往史记录' }}</b></div><div :class="{ alert: activePatient.allergic_history }"><span>过敏史</span><b>{{ activePatient.allergic_history || '暂无过敏记录' }}</b></div></div>
           <div class="record-progress"><span v-for="(label, i) in recordSections" :key="label" :class="{ filled: sectionFilled(i) }"><i>{{ i + 1 }}</i>{{ label }}</span></div>
           <div class="record-form" :class="{ locked: emr.locked }">
             <label><span><b>01</b>主诉</span><el-input v-model="emr.chief_complaint" :disabled="emr.locked" placeholder="症状、持续时间与就诊原因" /></label>
@@ -54,6 +54,8 @@ const currentUser = JSON.parse(localStorage.getItem('hospital_user') || '{}')
 const regs = ref([])
 const activePatient = computed(() => regs.value.find(r => r.registration_id === emr.registrationId))
 const pendingCount = computed(() => regs.value.filter(r => r.status !== 'DONE').length)
+const queueFilter = ref('all')
+const visibleRegs = computed(() => queueFilter.value === 'all' ? regs.value : regs.value.filter(r => queueFilter.value === 'done' ? r.status === 'DONE' : r.status !== 'DONE'))
 const recordSections = ['主诉', '现病史', '既往史', '过敏史', '检查', '诊断', '处理']
 const emr = reactive({ visible: false, locked: false, id: null, registrationId: null,
   chief_complaint: '', present_illness: '', past_history: '', allergy_history: '',

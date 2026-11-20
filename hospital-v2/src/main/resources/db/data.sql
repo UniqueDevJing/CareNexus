@@ -9,7 +9,8 @@ INSERT INTO user_account (id, username, password, real_name, role, phone) VALUES
     (1, 'admin',   '$2b$10$L3wrGhs7ygQYYc6q8TnbiuzxYNGR7gH636.tJ8puL4IkDUscaKzYq', '系统管理员', 'admin',   '13800000000'),
     (2, 'doctor',  '$2b$10$L3wrGhs7ygQYYc6q8TnbiuzxYNGR7gH636.tJ8puL4IkDUscaKzYq', '李建国',     'doctor',  '13900000001'),
     (3, 'patient', '$2b$10$L3wrGhs7ygQYYc6q8TnbiuzxYNGR7gH636.tJ8puL4IkDUscaKzYq', '张小明',     'patient', '13900000002'),
-    (4, 'huimin',  '$2b$10$L3wrGhs7ygQYYc6q8TnbiuzxYNGR7gH636.tJ8puL4IkDUscaKzYq', '惠民演示',   'patient', '13900000003');
+    (4, 'huimin',  '$2b$10$L3wrGhs7ygQYYc6q8TnbiuzxYNGR7gH636.tJ8puL4IkDUscaKzYq', '惠民演示',   'patient', '13900000003'),
+    (5, 'nurse',   '$2b$10$L3wrGhs7ygQYYc6q8TnbiuzxYNGR7gH636.tJ8puL4IkDUscaKzYq', '导诊护士',   'nurse',   '13900000004');
 
 -- 2. 科室（10 个）
 INSERT INTO department (id, name, code, description, icon) VALUES

@@ -27,6 +27,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
                         .requestMatchers("/api/health").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/nurse/**").hasRole("NURSE")
                         .requestMatchers("/api/doctor/**").hasAnyRole("DOCTOR", "ADMIN")
                         .requestMatchers("/api/patient/**").hasAnyRole("PATIENT", "ADMIN")
                         .anyRequest().authenticated())
