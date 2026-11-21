@@ -107,19 +107,32 @@ cd ../hospital-web-v2 && npm ci && npm run build
 
 生产环境使用 MySQL 8、随机 JWT Secret、独立模型密钥，并由 Nginx 或网关终止 HTTPS。部署说明见 [`deploy/部署指南.md`](deploy/部署指南.md)，质量记录见 [`QUALITY_GATE_REPORT.md`](QUALITY_GATE_REPORT.md)。
 
-## 竞赛副本（2026 Qoder 高校创造力大赛 · CareNexus SafePath）
+## 赛事作品（2026 Qoder 高校创造力大赛 · CareNexus）
 
-本仓库是独立竞赛副本，在原系统之上新增一个纯静态的竞赛演示入口：
+CareNexus 赛事作品与医院工作台使用同一套真实工程能力，围绕“患者信息如何安全进入医院协作流程”重新组织公开入口。页面展示代码、来源登记、构建结果和发布结果，不接收患者输入，也不读取生产数据。
 
-- 访问路径：竞赛构建站点根路径 `/` 会自动进入 `/contest`（路由 `meta.public`，无需登录、不依赖后端）；普通 `/CareNexus/` 构建仍保留 `/CareNexus/contest` 入口。
-- 页面：`hospital-web-v2/src/views/contest/ContestShowcase.vue` + 同名 CSS，复用 Vue、Element Plus、GSAP 与现有视觉语言，无新增依赖。
-- 静态演示边界：页面数据全部内置于组件状态，“分析这一段”“确认/退回/重置”等操作只改变本地状态并弹出 toast，不调用任何 API，不做真实医疗判断。
-- 虚构数据声明：病例（如“林晓，28 岁，胸闷伴呼吸困难”）为虚构演示数据，页面持续提示“演示数据 / 非医疗诊断 / 高风险情况请立即联系急救或专业机构”，不涉及任何真实隐私。
-- Qoder 开发流程：读取现有工作台与路由 → 保留患者/医生/管理端和后端 API 不动 → 新增独立公开演示路由 → `npm run build` 本地构建验证，产物可直接部署到静态站。
-- Qoder Sites 根路径静态发布：在 `hospital-web-v2` 下执行 `npm ci`、`npm run build:contest`（即 `vite build --mode contest --base=/`，产物资源引用改为根路径），再将 `dist` 目录发布到 Qoder Sites。竞赛构建是一个部署在站点根路径的纯静态站：访问 `/` 会自动重定向到 `/contest` 演示页。
-- 公网演示地址：<https://carenexus-safepath-yxmrb2k9vhk.qoder.website>（已设置为公开访问；评委应从根路径打开）。
-- 天池作品帖：<https://tianchi.aliyun.com/forum/post/1100237>（已提交，当前状态：审核中）。
-- 原系统的运行与部署说明保持不变（见上方“本地运行”“部署与验证”）；普通 `npm run build` 仍产出 `/CareNexus/` 子路径部署包，两种构建互不影响。
+- 作品入口：<https://carenexus-safepath-yxmrb2k9vhk.qoder.website/>。根路径进入公开作品页，静态资源不依赖登录或后端写入。
+- GitHub 代码：<https://github.com/UniqueDevJing/CareNexus/tree/contest/carenexus-independent-2026>。
+- 真实工作台：<http://114.215.186.113/CareNexus/>。该入口需要登录，并按患者、护士、医生、管理角色限制功能范围。
+- 天池文章：<https://tianchi.aliyun.com/forum/post/1100237>。
+- 作品入口实现：`hospital-web-v2/src/views/contest/ContestShowcase.vue` 与同名 CSS；`npm run build:contest` 使用根路径资源，普通 `npm run build` 仍使用 `/CareNexus/`。
+- 仓库事实：4 个角色工作区、7 条来源登记、30 个来源摘要、Agent 最大执行步数 7。数值均来自路由、`data.sql`、服务类和 `application.yml`，不是用户规模、准确率或临床效果指标。
+- 来源边界：知识库保留来源机构、版本、链接、短摘要和审核状态；只有 `SOURCE_VERIFIED` 或 `CLINICIAN_APPROVED` 的内容可以参与检索，未核验资料停留在审核状态。
+
+### Qoder 实际开发流程
+
+以下流程对应本次在 Windows Qoder 环境中的实际操作，命令均在仓库工作区执行：
+
+1. **读取仓库现状**：执行 `git fetch origin --prune`、`git log`、`git status`，确认最新生产分支、当前路由、后端服务、知识库表结构和现有发布入口。
+2. **确认业务链路**：读取患者、护士、医生、管理四端路由，核对 `ReActTriageAgent`、`ManualReviewService`、`KnowledgeService` 的状态和边界，再按实际职责组织页面信息。
+3. **核对来源登记**：从 `hospital-v2/src/main/resources/db/data.sql`、schema 和知识服务读取 7 条来源登记、30 个来源摘要、审核状态和权威链接；页面只呈现来源元数据与外链。
+4. **实现公开入口**：新增 `/contest` 公共路由、赛事构建模式和独立视觉页面；不接入患者输入，不创建临床结果，不改变普通工作台的登录和接口流程。
+5. **本地构建与测试**：执行 `npm ci`、`npm run build:contest`、`npm run build`、`mvn -q test` 和 `git diff --check`。构建或测试失败时不发布。
+6. **浏览器验收**：用 Playwright 检查桌面与移动视口、页面标题、导航、外链、资源加载、控制台错误和横向溢出；再检查公开 Qoder 地址的 HTTP 响应。
+7. **GitHub 推送与持续集成**：将代码推送到 `contest/carenexus-independent-2026`，由 GitHub Actions 重新执行后端测试、后端打包、普通前端构建和赛事前端构建。
+8. **Qoder Sites 发布**：使用真实 Qoder CLI 的 `qoder sites prepare_site`、`publish_site`、`get_publish_status` 发布 `hospital-web-v2/dist`，完成后重新打开公网地址验收。
+
+完整记录见 [`TIANCHI_SUBMISSION.md`](TIANCHI_SUBMISSION.md) 与 [`QUALITY_AUDIT_REPORT.md`](QUALITY_AUDIT_REPORT.md)。
 
 ## 相关项目
 

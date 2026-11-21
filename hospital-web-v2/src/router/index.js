@@ -14,9 +14,11 @@ const MyBills = () => import('../views/patient/MyBills.vue')
 const DoctorConsole = () => import('../views/doctor/DoctorConsole.vue')
 const NurseTriage = () => import('../views/nurse/NurseTriage.vue')
 const Login = () => import('../views/Login.vue')
+const ContestShowcase = () => import('../views/contest/ContestShowcase.vue')
 
 const routes = [
-  { path: '/', redirect: '/patient/pre' },
+  { path: '/', redirect: import.meta.env.VITE_CONTEST_BUILD === 'true' ? '/contest' : '/patient/pre' },
+  { path: '/contest', name: 'contest', component: ContestShowcase, meta: { public: true, title: 'CareNexus 医疗安全工作台' } },
   { path: '/login', name: 'login', component: Login, meta: { public: true, title: '登录' } },
   { path: '/admin/tools', name: 'tools', component: Tools, meta: { group: 'admin', title: '工具注册表', tag: 'MCP' } },
   { path: '/admin/knowledge', name: 'knowledge', component: Knowledge, meta: { group: 'admin', title: '医学知识库', tag: 'RAG' } },

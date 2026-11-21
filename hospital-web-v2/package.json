@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:contest": "vite build --mode contest",
     "preview": "vite preview"
   },
   "dependencies": {

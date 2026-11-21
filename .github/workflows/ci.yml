@@ -2,7 +2,7 @@ name: CareNexus CI
 
 on:
   push:
-    branches: [main, 'refactor/**']
+    branches: [main, 'refactor/**', 'contest/**']
   pull_request:
     branches: [main]
 
@@ -39,3 +39,4 @@ jobs:
           cache-dependency-path: hospital-web-v2/package-lock.json
       - run: npm ci
       - run: npm run build
+      - run: npm run build:contest
