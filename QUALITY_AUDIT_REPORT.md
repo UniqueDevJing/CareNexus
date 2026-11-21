@@ -50,8 +50,8 @@
 
 | 项目 | 验收命令或入口 | 最终结果 |
 | --- | --- | --- |
-| 赛事前端 | npm run build:contest | 通过，1699 modules，4.31 s |
-| 普通前端 | npm run build | 通过，1699 modules，4.84 s |
+| 赛事前端 | npm run build:contest | 通过，1699 modules，5.23 s |
+| 普通前端 | npm run build | 通过，1699 modules，5.32 s |
 | 后端 | mvn -q test | 通过，进程退出码 0 |
 | 差异格式 | git diff --check | 本地检查已通过；提交前再次执行 |
 | 本地浏览器 | Playwright，1440/1024/768/390 | 4 个视口横向溢出均为 0，标题正确，控制台错误 0 |

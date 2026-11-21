@@ -202,8 +202,8 @@ qoder sites get_publish_status
 
 | 验证项 | 结果 |
 | --- | --- |
-| 赛事前端构建 | 通过，1699 modules，4.31 s |
-| 普通前端构建 | 通过，1699 modules，4.84 s |
+| 赛事前端构建 | 通过，1699 modules，5.23 s |
+| 普通前端构建 | 通过，1699 modules，5.32 s |
 | Maven 测试 | 通过，进程退出码 0 |
 | 浏览器验收 | 1440、1024、768、390 四个视口横向溢出均为 0，标题正确，控制台错误 0 |
 | Qoder Sites | publication_completed，访问策略 public |
