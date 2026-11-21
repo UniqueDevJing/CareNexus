@@ -156,7 +156,7 @@
       </section>
     </main>
 
-    <footer class="contest-footer"><div class="contest-wrap contest-footer-inner"><div><strong>CareNexus</strong><p>面向医院真实工作流的就诊安全工作台。</p></div><div class="footer-links"><a :href="githubUrl" target="_blank" rel="noopener noreferrer">GitHub</a><a :href="productionUrl" target="_blank" rel="noopener noreferrer">真实工作台</a><a href="https://tianchi.aliyun.com/forum/post/1100237" target="_blank" rel="noopener noreferrer">赛事文章</a></div><small>来源链接归属各发布机构；知识库只保留来源登记、短摘要和引用信息。</small></div></footer>
+    <footer class="contest-footer"><div class="contest-wrap contest-footer-inner"><div><strong>CareNexus</strong><p>面向医院真实工作流的就诊安全工作台。</p></div><div class="footer-links"><a :href="githubUrl" target="_blank" rel="noopener noreferrer">GitHub</a><a :href="productionUrl" target="_blank" rel="noopener noreferrer">真实工作台</a><a :href="submissionUrl" target="_blank" rel="noopener noreferrer">作品文章正文</a><a href="https://tianchi.aliyun.com/forum/post/1100237" target="_blank" rel="noopener noreferrer">天池原帖</a></div><small>来源链接归属各发布机构；知识库只保留来源登记、短摘要和引用信息。</small></div></footer>
   </div>
 </template>
 
@@ -165,6 +165,7 @@ import './ContestShowcase.css'
 
 const githubUrl = 'https://github.com/UniqueDevJing/CareNexus/tree/contest/carenexus-independent-2026'
 const githubActionsUrl = 'https://github.com/UniqueDevJing/CareNexus/actions'
+const submissionUrl = 'https://github.com/UniqueDevJing/CareNexus/blob/contest/carenexus-independent-2026/TIANCHI_SUBMISSION.md'
 const productionUrl = 'http://114.215.186.113/CareNexus'
 
 const flowSteps = [
@@ -231,6 +232,6 @@ const verificationItems = [
   { label: '赛事作品', value: '公开可访问', detail: '根路径进入作品页，静态资源不依赖登录和后端写入。', action: '打开作品', href: 'https://carenexus-clinical-workflow-yxmrb2k9vhk.qoder.website/' },
   { label: '真实工作台', value: '四端可进入', detail: '患者、护士、医生、管理端沿用真实部署入口和角色权限。', action: '打开系统', href: productionUrl },
   { label: 'GitHub', value: '源码可追踪', detail: '页面、路由、来源登记和构建配置都在仓库内。', action: '打开仓库', href: githubUrl },
-  { label: '赛事文章', value: '过程可复核', detail: '文章记录作品目标、工程过程、证据来源和明确边界。', action: '打开文章', href: 'https://tianchi.aliyun.com/forum/post/1100237' },
+  { label: '作品文章', value: '正文可追踪', detail: '当前正文与工程证据已提交到 GitHub；天池原帖待账号会话更新。', action: '查看正文', href: submissionUrl },
 ]
 </script>

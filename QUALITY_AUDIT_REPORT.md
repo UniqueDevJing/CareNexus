@@ -111,3 +111,9 @@ Qoder CLI 只负责准备和发布静态产物；它不能替代后端测试、�
 ## 8. 最终判定
 
 Qoder Sites 已返回 publication_completed，公开地址可用，且公网浏览器标题、核心业务文案、四端入口、7 条来源和来源登记链接均已出现；GitHub 分支已推送。GitHub Actions 的最终状态以该分支对应运行记录为准，若后续失败，应按 CI 结果修复后再宣称持续集成通过。
+
+## 9. 天池文章状态
+
+- 参赛文章正文已整理在 TIANCHI_SUBMISSION.md，并随 contest/carenexus-independent-2026 分支提交到 GitHub。
+- 现有天池原帖为历史版本，当前浏览器会话未登录，页面没有可用的编辑或发布入口；因此本次没有把原帖更新状态写成已完成。
+- 登录天池账号后，可将 TIANCHI_SUBMISSION.md 的正文发布到指定赛事页面，再以天池页面实际返回结果为准。

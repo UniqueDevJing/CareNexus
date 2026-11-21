@@ -114,7 +114,7 @@ CareNexus 赛事作品与医院工作台使用同一套真实工程能力，围�
 - 作品入口：<https://carenexus-clinical-workflow-yxmrb2k9vhk.qoder.website/>。根路径进入公开作品页，静态资源不依赖登录或后端写入。
 - GitHub 代码：<https://github.com/UniqueDevJing/CareNexus/tree/contest/carenexus-independent-2026>。
 - 真实工作台：<http://114.215.186.113/CareNexus/>。该入口需要登录，并按患者、护士、医生、管理角色限制功能范围。
-- 天池文章：<https://tianchi.aliyun.com/forum/post/1100237>。
+- 天池原帖：<https://tianchi.aliyun.com/forum/post/1100237>；当前文章正文见 [`TIANCHI_SUBMISSION.md`](TIANCHI_SUBMISSION.md)，原帖更新需要已登录的天池账号。
 - 作品入口实现：`hospital-web-v2/src/views/contest/ContestShowcase.vue` 与同名 CSS；`npm run build:contest` 使用根路径资源，普通 `npm run build` 仍使用 `/CareNexus/`。
 - 仓库事实：4 个角色工作区、7 条来源登记、30 个来源摘要、Agent 最大执行步数 7。数值均来自路由、`data.sql`、服务类和 `application.yml`，不是用户规模、准确率或临床效果指标。
 - 来源边界：知识库保留来源机构、版本、链接、短摘要和审核状态；只有 `SOURCE_VERIFIED` 或 `CLINICIAN_APPROVED` 的内容可以参与检索，未核验资料停留在审核状态。
