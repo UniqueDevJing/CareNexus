@@ -2,7 +2,7 @@
 
 CareNexus 是我独立完成的医院就诊安全工作台。它不把 Agent 做成一个只会聊天的入口，而是把患者主诉、护士导诊、医生接诊、医学来源和运营审计连接成一条可追踪的业务链路。
 
-作品入口：<https://carenexus-safepath-yxmrb2k9vhk.qoder.website/>
+作品入口：<https://carenexus-clinical-workflow-yxmrb2k9vhk.qoder.website/>
 
 代码仓库：<https://github.com/UniqueDevJing/CareNexus/tree/contest/carenexus-independent-2026>
 

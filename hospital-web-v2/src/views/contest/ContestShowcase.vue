@@ -228,7 +228,7 @@ PS> git diff --check
 ✓ no whitespace errors`
 
 const verificationItems = [
-  { label: '赛事作品', value: '公开可访问', detail: '根路径进入作品页，静态资源不依赖登录和后端写入。', action: '打开作品', href: 'https://carenexus-safepath-yxmrb2k9vhk.qoder.website/' },
+  { label: '赛事作品', value: '公开可访问', detail: '根路径进入作品页，静态资源不依赖登录和后端写入。', action: '打开作品', href: 'https://carenexus-clinical-workflow-yxmrb2k9vhk.qoder.website/' },
   { label: '真实工作台', value: '四端可进入', detail: '患者、护士、医生、管理端沿用真实部署入口和角色权限。', action: '打开系统', href: productionUrl },
   { label: 'GitHub', value: '源码可追踪', detail: '页面、路由、来源登记和构建配置都在仓库内。', action: '打开仓库', href: githubUrl },
   { label: '赛事文章', value: '过程可复核', detail: '文章记录作品目标、工程过程、证据来源和明确边界。', action: '打开文章', href: 'https://tianchi.aliyun.com/forum/post/1100237' },

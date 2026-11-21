@@ -50,16 +50,16 @@
 
 | 项目 | 验收命令或入口 | 最终结果 |
 | --- | --- | --- |
-| 赛事前端 | npm run build:contest | 通过，1699 modules，4.13 s |
-| 普通前端 | npm run build | 通过，1699 modules，4.37 s |
+| 赛事前端 | npm run build:contest | 通过，1699 modules，4.31 s |
+| 普通前端 | npm run build | 通过，1699 modules，4.84 s |
 | 后端 | mvn -q test | 通过，进程退出码 0 |
 | 差异格式 | git diff --check | 本地检查已通过；提交前再次执行 |
 | 本地浏览器 | Playwright，1440/1024/768/390 | 4 个视口横向溢出均为 0，标题正确，控制台错误 0 |
-| Qoder 公开站 | qoder sites get_publish_status | 待发布后填入 |
-| 公网 HTTP | Qoder 地址 HEAD/GET | 待发布后填入 |
-| GitHub | contest 分支与 Actions | 待推送后填入 |
+| Qoder 公开站 | qoder sites get_publish_status | 已发布，publication_completed，访问策略 public |
+| 公网 HTTP | Qoder 地址 HEAD/GET | HTTP 200，Content-Type 为 text/html |
+| GitHub | contest 分支与 Actions | 分支已推送；Actions 结果在本次提交后继续观察 |
 
-本地结果来自本轮真实命令与浏览器输出；Qoder Sites 和 GitHub 两项在外部动作完成后回填。
+本地结果来自本轮真实命令与浏览器输出；Qoder Sites 已完成发布并复查公网入口，GitHub 分支已完成推送。
 
 ## 5. 页面质检
 
@@ -110,4 +110,4 @@ Qoder CLI 只负责准备和发布静态产物；它不能替代后端测试、�
 
 ## 8. 最终判定
 
-只有当第 4 节所有“待最终”项被真实输出替换，并且 Qoder Sites 与 GitHub 状态都能从公网或仓库重新打开时，本轮才判定为发布通过。任何一项失败，都应停止对外宣称发布完成并保留失败记录。
+Qoder Sites 已返回 publication_completed，公开地址可用，且公网浏览器标题、核心业务文案、四端入口、7 条来源和来源登记链接均已出现；GitHub 分支已推送。GitHub Actions 的最终状态以该分支对应运行记录为准，若后续失败，应按 CI 结果修复后再宣称持续集成通过。

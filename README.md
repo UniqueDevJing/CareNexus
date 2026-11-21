@@ -111,7 +111,7 @@ cd ../hospital-web-v2 && npm ci && npm run build
 
 CareNexus 赛事作品与医院工作台使用同一套真实工程能力，围绕“患者信息如何安全进入医院协作流程”重新组织公开入口。页面展示代码、来源登记、构建结果和发布结果，不接收患者输入，也不读取生产数据。
 
-- 作品入口：<https://carenexus-safepath-yxmrb2k9vhk.qoder.website/>。根路径进入公开作品页，静态资源不依赖登录或后端写入。
+- 作品入口：<https://carenexus-clinical-workflow-yxmrb2k9vhk.qoder.website/>。根路径进入公开作品页，静态资源不依赖登录或后端写入。
 - GitHub 代码：<https://github.com/UniqueDevJing/CareNexus/tree/contest/carenexus-independent-2026>。
 - 真实工作台：<http://114.215.186.113/CareNexus/>。该入口需要登录，并按患者、护士、医生、管理角色限制功能范围。
 - 天池文章：<https://tianchi.aliyun.com/forum/post/1100237>。
