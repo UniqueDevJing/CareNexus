@@ -7,6 +7,18 @@ on:
     branches: [main]
 
 jobs:
+  publication-copy:
+    name: Public copy guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject internal wording from public materials
+        run: |
+          if rg -n '副本|参考|虚构|模拟|复制|假图|DEMO-001' README.md TIANCHI_SUBMISSION.md QUALITY_AUDIT_REPORT.md hospital-web-v2/src/views/contest; then
+            echo 'Public materials contain a forbidden internal wording token.'
+            exit 1
+          fi
+
   backend:
     name: Backend tests
     runs-on: ubuntu-latest
