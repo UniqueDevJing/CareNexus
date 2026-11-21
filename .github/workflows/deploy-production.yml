@@ -39,6 +39,13 @@ jobs:
         working-directory: hospital-web-v2
         run: npm ci && npm run build
 
+      - name: Contest build and browser regression
+        working-directory: hospital-web-v2
+        run: |
+          npm run build:contest
+          npx playwright install --with-deps chromium
+          npm run test:e2e
+
       - name: Assemble release
         run: |
           set -euo pipefail

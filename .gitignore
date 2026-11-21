@@ -28,3 +28,4 @@ Thumbs.db
 .workbuddy/
 *.tar.gz
 hospital-v2/test-output.txt
+hospital-web-v2/test-results/
