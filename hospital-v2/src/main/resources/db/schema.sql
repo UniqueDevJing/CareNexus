@@ -110,26 +110,45 @@ CREATE TABLE knowledge_base (
 
 -- 9. 知识文档
 CREATE TABLE knowledge_doc (
-    id          BIGINT       NOT NULL AUTO_INCREMENT,
-    base_id     BIGINT      NOT NULL,
-    title       VARCHAR(128) NOT NULL,
-    source_type VARCHAR(16)  COMMENT 'upload|text',
-    status      VARCHAR(16) NOT NULL DEFAULT 'READY',
-    create_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id                  BIGINT       NOT NULL AUTO_INCREMENT,
+    base_id             BIGINT       NOT NULL,
+    title               VARCHAR(128) NOT NULL,
+    source_type         VARCHAR(32)  COMMENT 'GUIDELINE_SUMMARY|UPLOAD|TEXT',
+    status              VARCHAR(16)  NOT NULL DEFAULT 'READY',
+    authority_level     VARCHAR(32)  NOT NULL DEFAULT 'UNVERIFIED' COMMENT 'OFFICIAL_GUIDELINE|GOVERNMENT_GUIDANCE|UNVERIFIED',
+    source_organization VARCHAR(128),
+    source_url          VARCHAR(768),
+    source_doi          VARCHAR(128),
+    source_version      VARCHAR(64),
+    source_published_at DATE,
+    jurisdiction        VARCHAR(128),
+    population          VARCHAR(255),
+    evidence_grade      VARCHAR(64),
+    review_status       VARCHAR(32)  NOT NULL DEFAULT 'PENDING_REVIEW' COMMENT 'SOURCE_VERIFIED|CLINICIAN_APPROVED|PENDING_REVIEW|RETIRED',
+    review_note         VARCHAR(512),
+    license_note        VARCHAR(512),
+    reviewed_by         VARCHAR(64),
+    reviewed_at         DATETIME,
+    create_time         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 10. 知识片段（向量存 TEXT 列，JSON 数组）
 CREATE TABLE knowledge_segment (
     id            BIGINT       NOT NULL AUTO_INCREMENT,
-    doc_id         BIGINT      NOT NULL,
-    base_id         BIGINT      NOT NULL,
-    content        TEXT         NOT NULL,
-    embedding      TEXT         COMMENT 'JSON 数组，维度=embedding-dim',
+    doc_id        BIGINT       NOT NULL,
+    base_id       BIGINT       NOT NULL,
+    content       TEXT         NOT NULL,
+    embedding     TEXT         COMMENT 'JSON 数组，维度=embedding-dim',
     vector_status  VARCHAR(16) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING|READY',
-    create_time    DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    section_ref   VARCHAR(255),
+    page_ref      VARCHAR(64),
+    citation_key  VARCHAR(64),
+    safety_note   VARCHAR(512),
+    create_time   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    KEY idx_seg_base (base_id)
+    KEY idx_seg_base (base_id),
+    KEY idx_seg_doc (doc_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 11. MCP 工具注册表（数据库驱动真开关）

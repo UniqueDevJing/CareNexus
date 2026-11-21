@@ -85,6 +85,16 @@ public class AdminController {
         return Result.ok(Map.of("docId", knowledge.addDoc(baseId, title, content)));
     }
 
+    @PostMapping("/knowledge/review")
+    public Result<?> reviewDoc(@RequestBody Map<String, Object> body,
+                               @AuthenticationPrincipal AuthPrincipal principal) {
+        long docId = Long.parseLong(String.valueOf(body.get("docId")));
+        String status = String.valueOf(body.getOrDefault("reviewStatus", "PENDING_REVIEW"));
+        String note = String.valueOf(body.getOrDefault("note", ""));
+        String reviewer = principal == null ? "admin" : principal.username();
+        return Result.ok(knowledge.reviewDoc(docId, status, note, reviewer));
+    }
+
     @GetMapping("/knowledge/retrieve")
     public Result<?> retrieve(@RequestParam String q, @RequestParam(required = false) Long baseId,
                               @RequestParam(defaultValue = "4") int topK) {

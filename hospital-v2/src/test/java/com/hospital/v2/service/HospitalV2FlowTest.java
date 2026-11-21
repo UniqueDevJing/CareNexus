@@ -33,6 +33,8 @@ class HospitalV2FlowTest {
     @Autowired
     private ClinicalOrderService orders;
     @Autowired
+    private KnowledgeService knowledge;
+    @Autowired
     private Db db;
 
     @BeforeEach
@@ -117,6 +119,27 @@ class HospitalV2FlowTest {
                 "SELECT status, locked FROM pre_triage_session WHERE id=:id", Map.of("id", sid));
         assertEquals("LOCKED", session.get("status"));
         assertEquals(1, ((Number) session.get("locked")).intValue());
+    }
+
+    @Test
+    void evidence_retrieval_exposes_source_and_blocks_unreviewed_uploads() {
+        Map<String, Object> asthma = knowledge.listDocs(1L).stream()
+                .filter(row -> "支气管哮喘诊疗要点".equals(row.get("title")))
+                .findFirst().orElseThrow();
+        assertEquals("SOURCE_VERIFIED", asthma.get("review_status"));
+        assertEquals("OFFICIAL_GUIDELINE", asthma.get("authority_level"));
+        assertTrue(String.valueOf(asthma.get("source_url")).startsWith("https://"));
+
+        long uploadId = knowledge.addDoc(1L, "未核验测试资料", "这是一段未登记来源的测试内容");
+        assertEquals("PENDING_REVIEW", db.queryOne("SELECT review_status FROM knowledge_doc WHERE id=:id",
+                Map.of("id", uploadId)).get("review_status"));
+
+        List<Map<String, Object>> hits = knowledge.retrieve("哮喘如何评估和管理", 1L, 10);
+        assertFalse(hits.isEmpty());
+        assertTrue(hits.stream().allMatch(hit -> "SOURCE_VERIFIED".equals(hit.get("review_status"))
+                && String.valueOf(hit.get("source_url")).startsWith("https://")
+                && hit.get("source_notice") != null));
+        assertTrue(hits.stream().noneMatch(hit -> uploadId == ((Number) hit.get("doc_id")).longValue()));
     }
 
     @Test

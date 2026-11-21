@@ -159,6 +159,18 @@ public class ToolCenter {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("content", h.get("content"));
             m.put("score", h.get("score"));
+            m.put("source_title", h.get("source_title"));
+            m.put("source_organization", h.get("source_organization"));
+            m.put("source_version", h.get("source_version"));
+            m.put("source_url", h.get("source_url"));
+            m.put("source_doi", h.get("source_doi"));
+            m.put("section_ref", h.get("section_ref"));
+            m.put("citation_key", h.get("citation_key"));
+            m.put("authority_level", h.get("authority_level"));
+            m.put("review_status", h.get("review_status"));
+            m.put("clinical_use", h.get("clinical_use"));
+            m.put("source_notice", h.get("source_notice"));
+            m.put("safety_note", h.get("safety_note"));
             slim.add(m);
         }
         return JsonUtils.toJson(Map.of("count", slim.size(), "segments", slim));

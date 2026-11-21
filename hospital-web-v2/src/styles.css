@@ -365,3 +365,16 @@ h1, h2, h3, h4, p { margin-top: 0; }
   .billing-card header, .billing-card footer, .billing-meta { align-items: flex-start; flex-direction: column; }
   .billing-card footer .primary-button { width: 100%; }
 }
+
+.knowledge-doc { display: grid; grid-template-columns: 38px minmax(0, 1fr) 8px; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.knowledge-doc > div { min-width: 0; }
+.knowledge-doc b, .knowledge-doc small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.knowledge-doc b { font-size: 12px; }
+.knowledge-doc small { margin-top: 3px; color: var(--ink-soft); font-size: 10px; }
+.knowledge-doc > i { width: 7px; height: 7px; border-radius: 50%; background: var(--gold); }
+.knowledge-doc > i.verified { background: var(--teal); }
+.evidence-result { display: grid; gap: 9px; }
+.evidence-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; color: var(--ink-soft); font-size: 10px; }
+.evidence-meta strong { color: var(--teal-dark); font-size: 11px; }
+.evidence-meta a { color: var(--teal-dark); text-decoration: underline; text-underline-offset: 3px; }
+.evidence-notice { color: #8f5e47; font-size: 10px; line-height: 1.5; }
