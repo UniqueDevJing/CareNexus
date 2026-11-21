@@ -210,20 +210,24 @@ const processSteps = [
   { title: '读取 GitHub 最新状态', detail: 'Qoder 先检查分支、路由、后端服务、知识库 schema 和当前发布入口，再从真实工程现状决定页面信息。', command: 'git fetch origin --prune && git log origin/refactor/production-workspace-refresh' },
   { title: '把业务边界写进页面', detail: '以患者、护士、医生、管理四端的真实职责为主线，移除固定病例和结果回放，页面只呈现已实现的流程。', command: 'rg "patient|nurse|doctor|admin|PENDING_REVIEW" src hospital-v2' },
   { title: '核对来源登记', detail: '从 data.sql、schema.sql 和 KnowledgeService 读取来源机构、版本、链接、审核状态和安全提示。', command: 'rg "source_organization|source_url|review_status" hospital-v2' },
-  { title: '构建并检查', detail: '同时验证赛事根路径构建、普通工作台构建和后端测试；失败时停止发布，不用截图掩盖问题。', command: 'npm ci && npm run build:contest && npm run build && mvn -q test' },
+  { title: '构建并检查', detail: '先验证普通工作台，再验证后端；赛事构建最后执行，确保发布 dist 使用根路径资源。失败时停止发布。', command: 'npm ci && npm run build && mvn -q test && npm run build:contest' },
   { title: '推送并公开验收', detail: '将提交推送到 GitHub，发布静态作品，再从公网重新检查页面入口、外链、资源和响应式布局。', command: 'git diff --check && git push origin contest/carenexus-independent-2026' },
 ]
 
 const terminalText = `PS> git fetch origin --prune
-PS> git log origin/refactor/production-workspace-refresh -1
-52cb21e feat: add evidence-backed medical knowledge sources
-
-PS> npm run build:contest
-vite v7.3.8 building for contest...
+PS> npm run build
+vite v7.3.8 building for production...
 ✓ built successfully
 
 PS> mvn -q test
 ✓ tests completed successfully
+
+PS> npm run build:contest
+vite v7.3.8 building for contest...
+✓ built successfully; dist ready for Qoder Sites
+
+PS> qoder sites get_publish_status
+publication_completed / public
 
 PS> git diff --check
 ✓ no whitespace errors`
