@@ -176,8 +176,8 @@ Qoder 在本次工程中承担 Windows 开发环境、浏览器验收工具和 S
 ~~~powershell
 cd hospital-web-v2
 npm ci
-npm run build:contest
 npm run build
+npm run build:contest
 
 cd ..\hospital-v2
 mvn -q test
@@ -186,7 +186,7 @@ cd ..
 git diff --check
 ~~~
 
-完成本地验收后，再通过 Qoder Sites 准备和发布赛事产物，并重新检查公开地址：
+普通工作台构建完成后，必须最后执行 npm run build:contest，确保 dist 使用根路径资源，再通过 Qoder Sites 准备和发布赛事产物，并重新检查公开地址：
 
 ~~~powershell
 qoder sites prepare_site

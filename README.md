@@ -127,7 +127,7 @@ CareNexus 赛事作品与医院工作台使用同一套真实工程能力，围�
 2. **确认业务链路**：读取患者、护士、医生、管理四端路由，核对 `ReActTriageAgent`、`ManualReviewService`、`KnowledgeService` 的状态和边界，再按实际职责组织页面信息。
 3. **核对来源登记**：从 `hospital-v2/src/main/resources/db/data.sql`、schema 和知识服务读取 7 条来源登记、30 个来源摘要、审核状态和权威链接；页面只呈现来源元数据与外链。
 4. **实现公开入口**：新增 `/contest` 公共路由、赛事构建模式和独立视觉页面；不接入患者输入，不创建临床结果，不改变普通工作台的登录和接口流程。
-5. **本地构建与测试**：执行 `npm ci`、`npm run build:contest`、`npm run build`、`mvn -q test` 和 `git diff --check`。构建或测试失败时不发布。
+5. **本地构建与测试**：执行 `npm ci`、`npm run build`、`npm run build:contest`、`mvn -q test` 和 `git diff --check`；赛事构建必须最后执行，确保发布产物使用根路径资源。构建或测试失败时不发布。
 6. **浏览器验收**：用 Playwright 检查桌面与移动视口、页面标题、导航、外链、资源加载、控制台错误和横向溢出；再检查公开 Qoder 地址的 HTTP 响应。
 7. **GitHub 推送与持续集成**：将代码推送到 `contest/carenexus-independent-2026`，由 GitHub Actions 重新执行后端测试、后端打包、普通前端构建和赛事前端构建。
 8. **Qoder Sites 发布**：使用真实 Qoder CLI 的 `qoder sites prepare_site`、`publish_site`、`get_publish_status` 发布 `hospital-web-v2/dist`，完成后重新打开公网地址验收。
