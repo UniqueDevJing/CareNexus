@@ -37,7 +37,13 @@ jobs:
 
       - name: Frontend build
         working-directory: hospital-web-v2
-        run: npm ci && npm run build
+        run: |
+          npm ci
+          npm run build
+          rm -rf /tmp/carenexus-production-dist
+          cp -a dist /tmp/carenexus-production-dist
+          test -s /tmp/carenexus-production-dist/index.html
+          grep -q 'src="/CareNexus/assets/' /tmp/carenexus-production-dist/index.html
 
       - name: Contest build and browser regression
         working-directory: hospital-web-v2
@@ -51,7 +57,7 @@ jobs:
           set -euo pipefail
           mkdir -p release/web
           cp hospital-v2/target/hospital-v2.jar release/hospital-v2.jar
-          cp -a hospital-web-v2/dist/. release/web/
+          cp -a /tmp/carenexus-production-dist/. release/web/
           test -s release/hospital-v2.jar
           test -s release/web/index.html
           tar -czf carenexus-release.tgz -C release .
