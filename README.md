@@ -107,20 +107,6 @@ cd ../hospital-web-v2 && npm ci && npm run build
 
 生产环境使用 MySQL 8、随机 JWT Secret、独立模型密钥，并由 Nginx 或网关终止 HTTPS。部署说明见 [`deploy/部署指南.md`](deploy/部署指南.md)，质量记录见 [`QUALITY_GATE_REPORT.md`](QUALITY_GATE_REPORT.md)。
 
-## 竞赛副本（2026 Qoder 高校创造力大赛 · CareNexus SafePath）
-
-本仓库是独立竞赛副本，在原系统之上新增一个纯静态的竞赛演示入口：
-
-- 访问路径：竞赛构建站点根路径 `/` 会自动进入 `/contest`（路由 `meta.public`，无需登录、不依赖后端）；普通 `/CareNexus/` 构建仍保留 `/CareNexus/contest` 入口。
-- 页面：`hospital-web-v2/src/views/contest/ContestShowcase.vue` + 同名 CSS，复用 Vue、Element Plus、GSAP 与现有视觉语言，无新增依赖。
-- 静态演示边界：页面数据全部内置于组件状态，“分析这一段”“确认/退回/重置”等操作只改变本地状态并弹出 toast，不调用任何 API，不做真实医疗判断。
-- 虚构数据声明：病例（如“林晓，28 岁，胸闷伴呼吸困难”）为虚构演示数据，页面持续提示“演示数据 / 非医疗诊断 / 高风险情况请立即联系急救或专业机构”，不涉及任何真实隐私。
-- Qoder 开发流程：读取现有工作台与路由 → 保留患者/医生/管理端和后端 API 不动 → 新增独立公开演示路由 → `npm run build` 本地构建验证，产物可直接部署到静态站。
-- Qoder Sites 根路径静态发布：在 `hospital-web-v2` 下执行 `npm ci`、`npm run build:contest`（即 `vite build --mode contest --base=/`，产物资源引用改为根路径），再将 `dist` 目录发布到 Qoder Sites。竞赛构建是一个部署在站点根路径的纯静态站：访问 `/` 会自动重定向到 `/contest` 演示页。
-- 公网演示地址：<https://carenexus-safepath-yxmrb2k9vhk.qoder.website>（已设置为公开访问；评委应从根路径打开）。
-- 天池作品帖：<https://tianchi.aliyun.com/forum/post/1100237>（已提交，当前状态：审核中）。
-- 原系统的运行与部署说明保持不变（见上方“本地运行”“部署与验证”）；普通 `npm run build` 仍产出 `/CareNexus/` 子路径部署包，两种构建互不影响。
-
 ## 相关项目
 
 - [MinutesTrace](https://github.com/UniqueDevJing/minutestrace/)：会议资料、转写、证据链纪要和行动项协同工作台。
