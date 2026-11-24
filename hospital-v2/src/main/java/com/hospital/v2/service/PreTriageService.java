@@ -103,6 +103,23 @@ public class PreTriageService {
                 Map.of("s", sessionId));
     }
 
+    public String triageComplaint(long sessionId, String supplemental) {
+        List<String> statements = history(sessionId).stream()
+                .filter(row -> "user".equals(String.valueOf(row.get("role"))))
+                .map(row -> String.valueOf(row.get("content")))
+                .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
+        // 前端可能传完整历史或尚未发送的补充；已有历史始终以服务端为准。
+        String joined = String.join("，", statements);
+        if (supplemental != null && !supplemental.isBlank()
+                && !supplemental.equals(joined)
+                && (statements.isEmpty() || !supplemental.equals(statements.get(statements.size() - 1)))) {
+            statements.add(supplemental);
+            // 未经聊天发送的补充也要进入服务端记忆，刷新或再次分诊时不能丢失。
+            appendUser(sessionId, supplemental);
+        }
+        return String.join("，", statements);
+    }
+
     /** 让模型看到同一会话的全部上下文，而不是只看到最后一句。 */
     private List<ChatMessage> conversation(long sessionId, String currentText) {
         List<ChatMessage> messages = new java.util.ArrayList<>();

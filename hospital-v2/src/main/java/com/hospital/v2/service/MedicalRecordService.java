@@ -27,20 +27,25 @@ public class MedicalRecordService {
     };
 
     /** 新建或更新病历（草稿态）。已 SUBMITTED 的病历不可再改。 */
+    @Transactional
     public long saveDraft(Map<String, Object> body) {
         Long id = body.get("id") == null ? null : Long.valueOf(String.valueOf(body.get("id")));
         Map<String, Object> m = new LinkedHashMap<>(body);
+        for (String segment : SEGMENTS) m.putIfAbsent(segment, "");
         long registrationId = requiredId(body, "registration_id");
         long patientId = requiredId(body, "patient_id");
         long doctorId = requiredId(body, "doctor_id");
         Map<String, Object> registration = db.queryOne(
-                "SELECT id, payment_status FROM registration WHERE id=:registration AND patient_id=:patient AND doctor_id=:doctor",
+                "SELECT id, status, payment_status FROM registration WHERE id=:registration AND patient_id=:patient AND doctor_id=:doctor FOR UPDATE",
                 Map.of("registration", registrationId, "patient", patientId, "doctor", doctorId));
         if (registration == null) throw new BizException("病历必须绑定当前医生负责的患者和挂号");
         if (!"PAID".equals(String.valueOf(registration.get("payment_status")))) {
             throw new BizException("挂号费用尚未支付，不能建立正式病历");
         }
+        if ("DONE".equals(registration.get("status"))) throw new BizException("已结诊，不能修改病历");
         if (id == null) {
+            Map<String, Object> existing = db.queryOne("SELECT id FROM medical_record WHERE registration_id=:id", Map.of("id", registrationId));
+            if (existing != null) throw new BizException("该挂号已有病历，请刷新后编辑现有草稿");
             return db.insert("INSERT INTO medical_record (registration_id, patient_id, doctor_id, chief_complaint, "
                     + "present_illness, past_history, allergy_history, assistant_exam, diagnosis, treatment, status) "
                     + "VALUES (:registration_id,:patient_id,:doctor_id,:chief_complaint,:present_illness,:past_history,"
@@ -56,14 +61,14 @@ public class MedicalRecordService {
         }
         db.update("UPDATE medical_record SET chief_complaint=:chief_complaint, present_illness=:present_illness, "
                 + "past_history=:past_history, allergy_history=:allergy_history, assistant_exam=:assistant_exam, "
-                + "diagnosis=:diagnosis, treatment=:treatment WHERE id=:id", m);
+                + "diagnosis=:diagnosis, treatment=:treatment WHERE id=:id AND status='DRAFT'", m);
         return id;
     }
 
     /** 提交病历：草稿 → SUBMITTED 锁定；同步把对应挂号置为 DONE（完成就诊）。 */
     @Transactional
     public void submit(long recordId, long registrationId) {
-        Map<String, Object> payment = db.queryOne("SELECT payment_status FROM registration WHERE id=:id", Map.of("id", registrationId));
+        Map<String, Object> payment = db.queryOne("SELECT payment_status FROM registration WHERE id=:id FOR UPDATE", Map.of("id", registrationId));
         if (payment == null || !"PAID".equals(String.valueOf(payment.get("payment_status")))) {
             throw new BizException("挂号费用尚未支付，不能完成接诊");
         }

@@ -27,8 +27,11 @@ public class RegistrationService {
     @Transactional
     public Map<String, Object> register(Long suggestionId, Long patientId) {
         Map<String, Object> sug = db.queryOne(
-                "SELECT id, department_id, doctor_id, status FROM triage_suggestion WHERE id=:id", Map.of("id", suggestionId));
+                "SELECT id, patient_id, department_id, doctor_id, status FROM triage_suggestion WHERE id=:id FOR UPDATE", Map.of("id", suggestionId));
         if (sug == null) throw new BizException("分诊建议不存在");
+        if (!String.valueOf(patientId).equals(String.valueOf(sug.get("patient_id")))) {
+            throw new BizException("无权使用其他患者的分诊建议");
+        }
         if (!"CONFIRMED".equals(String.valueOf(sug.get("status")))) {
             throw new BizException("分诊建议尚未确认，暂不能预约，请重新分诊或联系人工服务");
         }
@@ -46,7 +49,7 @@ public class RegistrationService {
         long schedId = ((Number) sched.get("id")).longValue();
         // 乐观锁扣减
         int aff = db.update("UPDATE doctor_schedule SET remain_num=remain_num-1 "
-                + "WHERE id=:id AND remain_num>0", Map.of("id", schedId));
+                + "WHERE id=:id AND remain_num>0 AND status=1 AND work_date>=CURRENT_DATE", Map.of("id", schedId));
         if (aff == 0) throw new BizException("号源已被抢光，请重试");
 
         // 写挂号记录（唯一约束：不可重复预约）

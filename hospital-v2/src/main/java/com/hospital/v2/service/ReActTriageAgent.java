@@ -92,10 +92,10 @@ public class ReActTriageAgent {
                 AiMessage ai = resp.content();
                 steps++;
                 if (ai.hasToolExecutionRequests()) {
+                    msgs.add(ai);
                     for (ToolExecutionRequest req : ai.toolExecutionRequests()) {
                         long stepId = newStep(runId, steps, ai.text(), req.name(), req.arguments());
                         String result = tools.execute(req.name(), req.arguments(), runId, stepId, "agent");
-                        msgs.add(ai);
                         msgs.add(ToolExecutionResultMessage.from(req, result));
                         db.update("UPDATE agent_step SET output_json=:o, cost_ms=:c WHERE id=:id",
                                 Map.of("o", clip(result), "c", 30, "id", stepId));
@@ -104,6 +104,14 @@ public class ReActTriageAgent {
                     finalJson = parseFinal(ai.text());
                     if (finalJson != null) break;
                 }
+            }
+            // 工具预算耗尽后仍需一次无工具收尾，避免最后一次号源查询成功却被当作未收敛。
+            if (finalJson == null) {
+                msgs.add(UserMessage.from("工具调用已结束，请仅依据已返回的工具结果输出最终 JSON；无法确认时设置 needs_confirmation=true。"));
+                Response<AiMessage> summary = llm.generate(msgs, List.of());
+                degraded = degraded || "true".equals(String.valueOf(summary.metadata().get("degraded")));
+                finalJson = parseFinal(summary.content().text());
+                steps++;
             }
             if (finalJson == null) finalJson = fallback(complaint);
             if (degraded) {
@@ -147,7 +155,7 @@ public class ReActTriageAgent {
                 reason += "（已为你切换到本科室当前有号源的医生）";
             } else {
                 reason += "（当前科室暂无可约号源，请稍后重试或联系人工服务）";
-                conf = Math.min(conf, 0.6);
+                // 号源是运营可用性，不能改变分诊证据的置信度或触发人工临床核对。
             }
         }
 
@@ -262,7 +270,11 @@ public class ReActTriageAgent {
         int s = text.indexOf("{");
         int e = text.lastIndexOf("}");
         if (s < 0 || e < 0 || e <= s) return null;
-        return JsonUtils.fromJson(text.substring(s, e + 1), new com.fasterxml.jackson.core.type.TypeReference<>() {});
+        try {
+            return JsonUtils.fromJson(text.substring(s, e + 1), new com.fasterxml.jackson.core.type.TypeReference<>() {});
+        } catch (RuntimeException invalidModelOutput) {
+            return null;
+        }
     }
 
     private long newRun(Long sessionId, Long patientId) {

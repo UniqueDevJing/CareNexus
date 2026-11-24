@@ -88,7 +88,7 @@ public class PatientController {
                 Map.of("session", sessionId, "patient", session.get("patient_id")));
         if (suggestion != null) {
             Map<String, Object> registration = db.queryOne(
-                    "SELECT id AS registration_id, work_date, period FROM registration "
+                    "SELECT id AS registration_id, work_date, period, status, payment_status FROM registration "
                             + "WHERE suggestion_id=:suggestion AND patient_id=:patient ORDER BY id DESC LIMIT 1",
                     Map.of("suggestion", suggestion.get("suggestion_id"), "patient", session.get("patient_id")));
             Map<String, Object> schedule = db.queryOne(
@@ -175,7 +175,9 @@ public class PatientController {
         }
         long ownPatientId = currentUser.patientId(principal, patientId);
         currentUser.assertPatientOwnsSession(principal, sessionId);
-        TriageResult r = agent.triage(sessionId, ownPatientId, complaint);
+        if (preTriage.isLocked(sessionId)) throw new BizException("本次会话已完成，请开始新的预问诊");
+        String completeComplaint = preTriage.triageComplaint(sessionId, complaint);
+        TriageResult r = agent.triage(sessionId, ownPatientId, completeComplaint);
         boolean needsReview = Boolean.TRUE.equals(r.suggestion().get("needs_confirmation"));
         boolean redFlag = Integer.valueOf(String.valueOf(r.suggestion().getOrDefault("red_flag", 0))) == 1;
         long newSuggestionId = ((Number) r.suggestion().get("suggestion_id")).longValue();

@@ -1,5 +1,5 @@
 <template>
-  <section class="workspace doctor-space" aria-label="医生接诊工作区">
+  <section class="workspace doctor-space" aria-label="医生接诊工作区" :inert="busy">
     <header class="work-header doctor-header">
       <div><span class="eyebrow">医生工作台 / 今日接诊</span><h2>{{ currentUser.name || currentUser.username }}，从最早到诊的患者开始。</h2><p>队列、风险提示和结构化病历放在同一张接诊桌上，记录完成后再提交。</p></div>
       <div class="work-header-actions"><div class="doctor-shift"><span class="status-pip"></span><div><strong>门诊进行中</strong><small>今日排班 · {{ pendingCount }} 位待接诊</small></div></div><button class="secondary-button" @click="load">刷新队列</button></div>
@@ -54,16 +54,63 @@ const regs = ref([])
 const activePatient = computed(() => regs.value.find(r => r.registration_id === emr.registrationId))
 const pendingCount = computed(() => regs.value.filter(r => r.status !== 'DONE').length)
 const queueFilter = ref('all')
+const busy = ref(false)
+let detailSequence = 0
 const visibleRegs = computed(() => queueFilter.value === 'all' ? regs.value : regs.value.filter(r => queueFilter.value === 'done' ? r.status === 'DONE' : r.status !== 'DONE'))
 const recordSections = ['主诉', '现病史', '既往史', '过敏史', '检查', '诊断', '处理']
 const emr = reactive({ locked: false, id: null, registrationId: null, chief_complaint: '', present_illness: '', past_history: '', allergy_history: '', assistant_exam: '', diagnosis: '', treatment: '' })
 
 onMounted(load)
 async function load() { regs.value = await api.get('/doctor/registrations') }
-function openEmr(row) { emr.locked = row.record_status === 'SUBMITTED'; emr.id = row.record_id || null; emr.registrationId = row.registration_id; emr.chief_complaint = ''; emr.present_illness = ''; emr.past_history = row.past_history || ''; emr.allergy_history = row.allergic_history || ''; emr.assistant_exam = ''; emr.diagnosis = ''; emr.treatment = ''; if (row.record_id) api.get('/doctor/record', { recordId: row.record_id }).then(d => { emr.chief_complaint = d.chief_complaint || ''; emr.present_illness = d.present_illness || ''; emr.past_history = d.past_history || ''; emr.allergy_history = d.allergy_history || ''; emr.assistant_exam = d.assistant_exam || ''; emr.diagnosis = d.diagnosis || ''; emr.treatment = d.treatment || '' }) }
+async function openEmr(row) {
+  if (busy.value) return
+  const sequence = ++detailSequence
+  emr.locked = row.record_status === 'SUBMITTED' || row.status === 'DONE'
+  emr.id = row.record_id || null; emr.registrationId = row.registration_id
+  for (const key of ['chief_complaint', 'present_illness', 'assistant_exam', 'diagnosis', 'treatment']) emr[key] = ''
+  emr.past_history = row.past_history || ''; emr.allergy_history = row.allergic_history || ''
+  if (!row.record_id) return
+  try {
+    const record = await api.get('/doctor/record', { recordId: row.record_id })
+    if (sequence !== detailSequence) return
+    for (const key of ['chief_complaint', 'present_illness', 'past_history', 'allergy_history', 'assistant_exam', 'diagnosis', 'treatment']) emr[key] = record[key] || ''
+  } catch { if (sequence === detailSequence) emr.locked = true; ElMessage.error('病历加载失败，请重新选择患者') }
+}
 function sectionFilled(index) { return Boolean(emr[['chief_complaint', 'present_illness', 'past_history', 'allergy_history', 'assistant_exam', 'diagnosis', 'treatment'][index]]) }
-async function saveDraft() { const r = await api.post('/doctor/record/save', null, { id: emr.id, registration_id: emr.registrationId, patient_id: currentPatientId(), chief_complaint: emr.chief_complaint, present_illness: emr.present_illness, past_history: emr.past_history, allergy_history: emr.allergy_history, assistant_exam: emr.assistant_exam, diagnosis: emr.diagnosis, treatment: emr.treatment }); emr.id = r.recordId; ElMessage.success('草稿已保存'); load() }
-async function submit() { if (!emr.id) { const r = await api.post('/doctor/record/save', null, { id: null, registration_id: emr.registrationId, patient_id: currentPatientId(), chief_complaint: emr.chief_complaint, present_illness: emr.present_illness, past_history: emr.past_history, allergy_history: emr.allergy_history, assistant_exam: emr.assistant_exam, diagnosis: emr.diagnosis, treatment: emr.treatment }); emr.id = r.recordId } await api.post('/doctor/record/submit?1=1', { recordId: emr.id, registrationId: emr.registrationId }); ElMessage.success('病历已提交，接诊已完成'); load() }
-async function finish(row) { await api.post('/doctor/registration/done?1=1', { registrationId: row.registration_id }); ElMessage.success('已结诊'); load() }
+async function saveDraft() {
+  if (busy.value || emr.locked) return
+  busy.value = true
+  try {
+    const r = await api.post('/doctor/record/save', null, { ...emr, registration_id: emr.registrationId, patient_id: currentPatientId() })
+    emr.id = r.recordId; ElMessage.success('草稿已保存'); await load()
+  } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '保存失败') }
+  finally { busy.value = false }
+}
+async function submit() {
+  if (busy.value || emr.locked) return
+  busy.value = true
+  try {
+    // 提交前保存屏幕上的最新内容，已有草稿也不能跳过更新。
+    {
+      const r = await api.post('/doctor/record/save', null, { ...emr, registration_id: emr.registrationId, patient_id: currentPatientId() })
+      emr.id = r.recordId
+    }
+    await api.post('/doctor/record/submit', { recordId: emr.id, registrationId: emr.registrationId })
+    emr.locked = true
+    ElMessage.success('病历已提交，接诊已完成')
+    await load()
+  } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '提交失败') }
+  finally { busy.value = false }
+}
+async function finish(row) {
+  if (busy.value) return
+  busy.value = true
+  try {
+    await api.post('/doctor/registration/done', { registrationId: row.registration_id })
+    if (emr.registrationId === row.registration_id) emr.locked = true
+    ElMessage.success('已结诊'); await load()
+  } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '结诊失败') }
+  finally { busy.value = false }
+}
 function currentPatientId() { const row = regs.value.find(r => r.registration_id === emr.registrationId); return row ? row.patient_id : null }
 </script>

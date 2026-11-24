@@ -1,5 +1,5 @@
 <template>
-  <section class="workspace nurse-space" aria-label="护士人工导诊工作区">
+  <section class="workspace nurse-space" aria-label="护士人工导诊工作区" :inert="submitting">
     <header class="work-header nurse-header">
       <div><span class="eyebrow">护士工作台 / 异常接管</span><h2>只把需要人判断的患者，交到你手里。</h2><p>护士不是重复阅读聊天记录，而是补齐改变就医路径的那一个关键信息。</p></div>
       <div class="work-header-actions"><div class="nurse-shift"><span class="status-pip"></span><div><strong>导诊服务在线</strong><small>队列每 30 秒刷新 · {{ actionableCount }} 条待处理</small></div></div><button class="secondary-button" @click="load">刷新队列</button></div>
@@ -62,6 +62,7 @@ const queue = ref([])
 const selected = ref(null)
 const filter = ref('all')
 const note = ref('')
+const submitting = ref(false)
 let refreshTimer
 
 const actionableCount = computed(() => queue.value.filter(item => item.status === 'PENDING').length)
@@ -79,18 +80,22 @@ function statusLabel(status) { return ({ PENDING: '待护士处理', NEED_MORE_I
 function confidence(value) { const number = Number(value); return Number.isFinite(number) && number > 0 ? `${Math.round(number * 100)}%` : '未提供' }
 function selectCase(item) { selected.value = item; note.value = '' }
 async function load() {
+  if (submitting.value) return
   try {
     queue.value = await api.get('/nurse/triage/queue')
     if (selected.value) selected.value = queue.value.find(item => item.suggestion_id === selected.value.suggestion_id) || null
   } catch (error) { ElMessage.error(error.response?.data?.msg || error.message || '导诊队列加载失败') }
 }
 async function resolve(action) {
+  if (submitting.value) return
   if (!selected.value || !note.value.trim()) { ElMessage.warning(action === 'REQUEST_INFO' ? '请写清楚要患者补充的具体问题' : '请先填写处理依据'); return }
+  submitting.value = true
   try {
     await api.post('/nurse/triage/resolve', null, { suggestionId: selected.value.suggestion_id, action, note: note.value.trim() })
     ElMessage.success(action === 'CONFIRM' ? '分诊已确认，患者可继续预约' : action === 'REQUEST_INFO' ? '追问已发出，等待患者补充' : '已转急诊 / 人工医生')
-    selected.value = null; note.value = ''; await load()
+    selected.value = null; note.value = ''
   } catch (error) { ElMessage.error(error.response?.data?.msg || error.message || '处理失败，请稍后重试') }
+  finally { submitting.value = false; await load() }
 }
 onMounted(() => { load(); refreshTimer = window.setInterval(load, 30000) })
 onUnmounted(() => window.clearInterval(refreshTimer))

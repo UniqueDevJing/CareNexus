@@ -1,5 +1,5 @@
 <template>
-  <section class="workspace patient-space" aria-label="智能预问诊工作区">
+  <section class="workspace patient-space" :inert="busy" :aria-busy="busy" aria-label="智能预问诊工作区">
     <header class="patient-page-head">
       <div>
         <span class="eyebrow">患者服务 / 就诊准备</span>
@@ -58,7 +58,8 @@
           <div v-if="needsReview" class="booking-handoff">
             <div class="handoff-status"><span class="handoff-dot" aria-hidden="true"></span><div><strong>{{ reviewLabel() }}</strong><small>{{ sug.queue_code || '已建立人工任务' }} · {{ updatedLabel() }}</small></div></div>
             <p v-if="sug.manual_question"><b>护士想确认：</b>{{ sug.manual_question }}</p>
-            <p v-else>患者信息已提交给护士。护士只会补问会改变就医路径的关键信息。</p>
+            <p v-else>科室仅为初步建议，尚未通过人工核对。资料已提交护士，核对完成后再确认就诊安排。</p>
+            <p v-if="!sug.suggested_date">当前尚无可确认号源；人工核对与号源安排是两个独立步骤，核对通过也不代表预约成功。</p>
             <button class="secondary-button" :disabled="refreshing" @click="refreshReview()">{{ refreshing ? '刷新中…' : '刷新人工状态' }}</button>
           </div>
           <div v-else-if="sug.status === 'REJECTED'" class="booking-handoff booking-handoff--warning"><strong>当前建议未进入预约</strong><p>系统无法安全确认本次安排，已转人工处理。请继续补充症状，或联系门诊服务台。</p></div>
@@ -93,6 +94,7 @@
 import { ref, nextTick, reactive, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '../../api'
+import { createSseParser } from '../../sse'
 
 const sessionId = ref(null)
 const msgs = ref([])
@@ -107,6 +109,9 @@ const reg = ref({})
 const box = ref(null)
 const saving = ref(false)
 const refreshing = ref(false)
+const busy = ref(false)
+let disposed = false
+let chatAbort
 const lastUpdated = ref(null)
 const profile = reactive({ name: '', gender: '男', age: null, past_history: '', allergic_history: '' })
 let statusTimer
@@ -114,9 +119,11 @@ let statusTimer
 async function loadProfile() { const p = await api.get('/patient/profile'); if (p) Object.assign(profile, { name: p.name || '', gender: p.gender || '男', age: p.age, past_history: p.past_history || '', allergic_history: p.allergic_history || '' }) }
 async function saveProfile() { saving.value = true; try { await api.post('/patient/profile/save', null, profile); ElMessage.success('健康档案已保存') } finally { saving.value = false } }
 async function restoreSession() {
+  const previousSession = sessionId.value
   const saved = localStorage.getItem('carenexus_pretriage_session'); if (!saved) return false
   try {
     const data = await api.get('/patient/session/history', { sessionId: Number(saved) })
+    if (disposed || sessionId.value !== previousSession) return true
     sessionId.value = data.sessionId; locked.value = Number(data.locked) === 1 || data.status === 'LOCKED'; msgs.value = (data.messages || []).map(m => ({ role: m.role === 'assistant' ? 'bot' : 'user', text: m.content }))
     if (data.suggestion) { sug.value = data.suggestion; suggested.value = true; needsReview.value = !!data.suggestion.needs_confirmation; registered.value = Number(data.suggestion.registered) === 1 || !!data.registration; if (data.registration) reg.value = data.registration; lastUpdated.value = new Date() }
     scroll()
@@ -127,34 +134,53 @@ onMounted(async () => {
   await loadProfile(); await restoreSession()
   statusTimer = window.setInterval(() => { if (sessionId.value && suggested.value && needsReview.value) refreshReview(true) }, 30000)
 })
-onUnmounted(() => window.clearInterval(statusTimer))
+onUnmounted(() => { disposed = true; chatAbort?.abort(); window.clearInterval(statusTimer) })
 function scroll() { nextTick(() => { if (box.value) box.value.scrollTop = box.value.scrollHeight }) }
-async function start() { const r = await api.post('/patient/session'); sessionId.value = r.sessionId; localStorage.setItem('carenexus_pretriage_session', String(r.sessionId)); msgs.value = []; locked.value = false; suggested.value = false; needsReview.value = false; registered.value = false; sug.value = {}; lastUpdated.value = null; ElMessage.success('就诊对话已建立') }
+async function startRequest() { const r = await api.post('/patient/session'); sessionId.value = r.sessionId; localStorage.setItem('carenexus_pretriage_session', String(r.sessionId)); msgs.value = []; locked.value = false; suggested.value = false; needsReview.value = false; registered.value = false; sug.value = {}; lastUpdated.value = null; ElMessage.success('就诊对话已建立') }
+async function start() {
+  if (busy.value || streaming.value || refreshing.value || disposed) return
+  busy.value = true
+  try { await startRequest() } finally { busy.value = false }
+}
 async function send() {
+  if (busy.value || refreshing.value || disposed || locked.value || !sessionId.value) return
   const text = input.value.trim(); if (!text || streaming.value) return
   msgs.value.push({ role: 'user', text }); input.value = ''; streaming.value = true
   const assistant = { role: 'bot', text: '', typing: true }; msgs.value.push(assistant); scroll()
   let delivered = false
   try {
-    const resp = await fetch('/v2/api/patient/chat', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: sessionId.value, msg: text }) })
+    chatAbort = new AbortController()
+    const resp = await fetch('/v2/api/patient/chat', { signal: chatAbort.signal, method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: sessionId.value, msg: text }) })
     if (!resp.ok) throw new Error(`SSE ${resp.status}`)
-    const reader = resp.body.getReader(); const decoder = new TextDecoder(); let buf = ''
-    while (true) { const { done, value } = await reader.read(); if (done) break; buf += decoder.decode(value, { stream: true }); const blocks = buf.split('\n\n'); buf = blocks.pop(); for (const b of blocks) { const line = b.trim(); if (line.startsWith('data:')) { const data = line.slice(5).trim(); if (data === '[DONE]') { assistant.typing = false; continue } assistant.text += data; scroll() } } }
+    const reader = resp.body.getReader(); const decoder = new TextDecoder()
+    const parser = createSseParser(data => { if (data === '[DONE]') { assistant.typing = false; return } assistant.text += data; scroll() })
+    while (true) { const { done, value } = await reader.read(); if (done) break; parser.push(decoder.decode(value, { stream: true })) }
+    parser.push(decoder.decode()); parser.finish()
     assistant.typing = false
     delivered = true
   } catch (e) { assistant.text = '连接暂时中断，请检查网络后重试。'; assistant.typing = false; ElMessage.error('导诊助手连接失败，请稍后重试') }
   if (delivered && needsReview.value && sug.value.status === 'NEED_MORE_INFO') { sug.value = { ...sug.value, status: 'PENDING', manual_question: '' } }
   streaming.value = false
 }
-async function doTriage() { const complaint = input.value.trim() || msgs.value.filter(m => m.role === 'user').map(m => m.text).join('，'); if (!complaint) { ElMessage.warning('请先描述症状'); return } try { const result = await api.post('/patient/triage', { sessionId: sessionId.value, complaint }); sug.value = result; suggested.value = true; needsReview.value = !!result.needs_confirmation; locked.value = !needsReview.value || Number(result.red_flag) === 1; lastUpdated.value = new Date() } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '暂时无法生成就诊建议') } }
+async function doTriageRequest() { const complaint = input.value.trim() || msgs.value.filter(m => m.role === 'user').map(m => m.text).join('，'); if (!complaint) { ElMessage.warning('请先描述症状'); return } try { const result = await api.post('/patient/triage', { sessionId: sessionId.value, complaint }); sug.value = result; suggested.value = true; needsReview.value = !!result.needs_confirmation; locked.value = !needsReview.value || Number(result.red_flag) === 1; lastUpdated.value = new Date() } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '暂时无法生成就诊建议') } }
+async function doTriage() {
+  if (busy.value || streaming.value || refreshing.value || disposed) return
+  busy.value = true
+  try { await doTriageRequest() } finally { busy.value = false }
+}
 async function refreshReview(silent = false) {
-  if (!sessionId.value || refreshing.value) return
+  if (!sessionId.value || refreshing.value || busy.value || streaming.value || disposed) return
   refreshing.value = true
   try { const restored = await restoreSession(); if (!restored) throw new Error('人工状态暂时不可用'); if (!silent) ElMessage.success(needsReview.value ? '人工状态仍在处理中' : '人工状态已更新') }
   catch (e) { if (!silent) ElMessage.error('暂时无法刷新人工处理状态') }
   finally { refreshing.value = false }
 }
-async function doRegister() { try { reg.value = await api.post('/patient/register', { suggestionId: sug.value.suggestion_id }); registered.value = true; ElMessage.success(`预约成功：${reg.value.work_date} ${reg.value.period}`) } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '预约失败，号源可能刚刚被占用') } }
+async function doRegisterRequest() { try { reg.value = await api.post('/patient/register', { suggestionId: sug.value.suggestion_id }); registered.value = true; ElMessage.success(`预约成功：${reg.value.work_date} ${reg.value.period}`) } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '预约失败，号源可能刚刚被占用') } }
+async function doRegister() {
+  if (busy.value || streaming.value || refreshing.value || disposed) return
+  busy.value = true
+  try { await doRegisterRequest() } finally { busy.value = false }
+}
 function reviewLabel() { if (sug.value.red_flag) return '已转急诊 / 人工医生'; if (sug.value.status === 'NEED_MORE_INFO') return '等待你补充信息'; if (sug.value.status === 'REJECTED') return '已转人工处理'; return '已提交护士核对' }
 function updatedLabel() { return lastUpdated.value ? `最近更新 ${lastUpdated.value.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}` : '状态会自动更新' }
 </script>
