@@ -107,33 +107,6 @@ cd ../hospital-web-v2 && npm ci && npm run build
 
 生产环境使用 MySQL 8、随机 JWT Secret、独立模型密钥，并由 Nginx 或网关终止 HTTPS。部署说明见 [`deploy/部署指南.md`](deploy/部署指南.md)，质量记录见 [`QUALITY_GATE_REPORT.md`](QUALITY_GATE_REPORT.md)。
 
-## 赛事作品（2026 Qoder 高校创造力大赛 · CareNexus）
-
-CareNexus 赛事作品与医院工作台使用同一套真实工程能力，围绕“患者信息如何安全进入医院协作流程”重新组织公开入口。页面展示代码、来源登记、构建结果和发布结果，不接收患者输入，也不读取生产数据。
-
-- 作品入口：<https://carenexus-clinical-workflow-yxmrb2k9vhk.qoder.website/>。根路径进入公开作品页，静态资源不依赖登录或后端写入。
-- GitHub 代码：<https://github.com/UniqueDevJing/CareNexus/tree/contest/carenexus-independent-2026>。
-- 真实工作台：<http://114.215.186.113/CareNexus/>。该入口需要登录，并按患者、护士、医生、管理角色限制功能范围。
-- 天池原帖：<https://tianchi.aliyun.com/forum/post/1100237>；当前文章正文见 [`TIANCHI_SUBMISSION.md`](TIANCHI_SUBMISSION.md)，原帖更新需要已登录的天池账号。
-- 作品入口实现：`hospital-web-v2/src/views/contest/ContestShowcase.vue` 与同名 CSS；`npm run build:contest` 使用根路径资源，普通 `npm run build` 仍使用 `/CareNexus/`。
-- 仓库事实：4 个角色工作区、7 条来源登记、30 个来源摘要、Agent 最大执行步数 7。数值均来自路由、`data.sql`、服务类和 `application.yml`，不是用户规模、准确率或临床效果指标。
-- 来源边界：知识库保留来源机构、版本、链接、短摘要和审核状态；只有 `SOURCE_VERIFIED` 或 `CLINICIAN_APPROVED` 的内容可以参与检索，未核验资料停留在审核状态。
-
-### Qoder 实际开发流程
-
-以下流程对应本次在 Windows Qoder 环境中的实际操作，命令均在仓库工作区执行：
-
-1. **读取仓库现状**：执行 `git fetch origin --prune`、`git log`、`git status`，确认最新生产分支、当前路由、后端服务、知识库表结构和现有发布入口。
-2. **确认业务链路**：读取患者、护士、医生、管理四端路由，核对 `ReActTriageAgent`、`ManualReviewService`、`KnowledgeService` 的状态和边界，再按实际职责组织页面信息。
-3. **核对来源登记**：从 `hospital-v2/src/main/resources/db/data.sql`、schema 和知识服务读取 7 条来源登记、30 个来源摘要、审核状态和权威链接；页面只呈现来源元数据与外链。
-4. **实现公开入口**：新增 `/contest` 公共路由、赛事构建模式和独立视觉页面；不接入患者输入，不创建临床结果，不改变普通工作台的登录和接口流程。
-5. **本地构建与测试**：执行 `npm ci`、`npm run build`、`npm run build:contest`、`mvn -q test` 和 `git diff --check`；赛事构建必须最后执行，确保发布产物使用根路径资源。构建或测试失败时不发布。
-6. **浏览器验收**：用 Playwright 检查桌面与移动视口、页面标题、导航、外链、资源加载、控制台错误和横向溢出；再检查公开 Qoder 地址的 HTTP 响应。
-7. **GitHub 推送与持续集成**：将代码推送到 `contest/carenexus-independent-2026`，由 GitHub Actions 重新执行后端测试、后端打包、普通前端构建和赛事前端构建。
-8. **Qoder Sites 发布**：使用真实 Qoder CLI 的 `qoder sites prepare_site`、`publish_site`、`get_publish_status` 发布 `hospital-web-v2/dist`，完成后重新打开公网地址验收。
-
-完整记录见 [`TIANCHI_SUBMISSION.md`](TIANCHI_SUBMISSION.md) 与 [`QUALITY_AUDIT_REPORT.md`](QUALITY_AUDIT_REPORT.md)。
-
 ## 相关项目
 
 - [MinutesTrace](https://github.com/UniqueDevJing/minutestrace/)：会议资料、转写、证据链纪要和行动项协同工作台。
