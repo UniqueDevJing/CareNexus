@@ -18,10 +18,12 @@ import java.util.LinkedHashMap;
 public class RegistrationService {
     private final Db db;
     private final PaymentService payments;
+    private final BookingPreferenceService preferences;
 
-    public RegistrationService(Db db, PaymentService payments) {
+    public RegistrationService(Db db, PaymentService payments, BookingPreferenceService preferences) {
         this.db = db;
         this.payments = payments;
+        this.preferences = preferences;
     }
 
     @Transactional
@@ -31,10 +33,16 @@ public class RegistrationService {
 
     public List<Map<String, Object>> availableSlots(Long suggestionId, Long patientId) {
         Map<String, Object> sug = confirmedSuggestion(suggestionId, patientId, false);
-        return db.query("SELECT id, work_date, period, remain_num FROM doctor_schedule "
+        List<Map<String, Object>> slots = db.query("SELECT id, work_date, period, remain_num FROM doctor_schedule "
                         + "WHERE doctor_id=:doc AND status=1 AND remain_num>0 AND work_date>=:today "
                         + "ORDER BY work_date, period LIMIT 12",
                 Map.of("doc", sug.get("doctor_id"), "today", LocalDate.now().toString()));
+        List<Map<String, Object>> messages = db.query(
+                "SELECT content FROM pre_triage_message WHERE session_id=:session AND role='user' ORDER BY id",
+                Map.of("session", sug.get("session_id")));
+        String conversation = messages.stream().map(row -> String.valueOf(row.get("content")))
+                .collect(java.util.stream.Collectors.joining("，"));
+        return preferences.rank(slots, conversation);
     }
 
     @Transactional
@@ -97,7 +105,7 @@ public class RegistrationService {
 
     private Map<String, Object> confirmedSuggestion(Long suggestionId, Long patientId, boolean lock) {
         Map<String, Object> sug = db.queryOne(
-                "SELECT id, patient_id, department_id, doctor_id, status FROM triage_suggestion WHERE id=:id"
+                "SELECT id, session_id, patient_id, department_id, doctor_id, status FROM triage_suggestion WHERE id=:id"
                         + (lock ? " FOR UPDATE" : ""), Map.of("id", suggestionId));
         if (sug == null) throw new BizException("分诊建议不存在");
         if (!String.valueOf(patientId).equals(String.valueOf(sug.get("patient_id")))) {

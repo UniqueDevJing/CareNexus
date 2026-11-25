@@ -6,10 +6,10 @@
     </section>
 
     <section class="metric-grid metric-grid--four" aria-label="运营核心指标">
-      <article class="metric-tile"><span>今日分诊建议</span><strong>{{ ov.totalSuggestion || 0 }}</strong><small>已生成并可追踪</small></article>
+      <article class="metric-tile"><span>累计分诊建议</span><strong>{{ ov.totalSuggestion || 0 }}</strong><small>Agent 平均 {{ ov.avgAgentLatencyMs || 0 }}ms</small></article>
       <article class="metric-tile"><span>建议转挂号</span><strong>{{ ov.hitRate || 0 }}<em>%</em></strong><small>建议后完成挂号</small></article>
-      <article class="metric-tile"><span>号源使用率</span><strong>{{ enh.slotUsage || '0%' }}</strong><small>{{ enh.registrations || 0 }} 次有效挂号</small></article>
-      <article class="metric-tile" :class="{ 'metric-tile--alert': ov.redFlag || manualReviews.length }"><span>人工队列</span><strong>{{ manualReviews.length }}</strong><small>{{ ov.waitingPatient || 0 }} 个等待患者补充</small></article>
+      <article class="metric-tile"><span>平均沟通轮数</span><strong>{{ ov.avgConversationTurns || 0 }}</strong><small>越少代表患者重复输入越少</small></article>
+      <article class="metric-tile" :class="{ 'metric-tile--alert': ov.redFlag || manualReviews.length }"><span>人工介入率</span><strong>{{ ov.manualInterventionRate || 0 }}<em>%</em></strong><small>{{ manualReviews.length }} 个待处理 · {{ ov.waitingPatient || 0 }} 个待补充</small></article>
     </section>
 
     <section class="surface review-panel" v-if="manualReviews.length">

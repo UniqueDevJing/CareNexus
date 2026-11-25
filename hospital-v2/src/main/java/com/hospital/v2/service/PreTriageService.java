@@ -17,7 +17,9 @@ import java.util.Map;
  */
 @Service
 public class PreTriageService {
-    private static final String PRE_SYS = "你是医院预问诊助手，用简短口语化中文追问患者症状，每次只问一个重点，不要罗列。";
+    private static final String PRE_SYS = "你是医院预问诊助手，用简短口语化中文追问患者症状，每次只问一个重点，不要罗列。"
+            + "当症状、持续时间和重要伴随症状已经明确，或患者已经回答三轮时，不再重复追问，"
+            + "必须以‘信息已齐全，正在为您匹配就诊安排…’结束回复。";
 
     private final Db db;
     private final LlmGateway llm;
@@ -94,7 +96,7 @@ public class PreTriageService {
             case 1 -> "请问这个症状出现多久了？是持续性的还是一阵一阵的？";
             case 2 -> "有没有伴随其他不舒服，比如发热、咳痰、胸闷或者头晕？";
             case 3 -> "以前有没有类似的情况，或者正在长期吃哪些药？";
-            default -> "了解得差不多了，正在为您发起智能分诊，请稍候…";
+            default -> "信息已齐全，正在为您匹配就诊安排…";
         };
     }
 
@@ -144,7 +146,8 @@ public class PreTriageService {
                 "SELECT patient_id FROM pre_triage_session WHERE id=:id", Map.of("id", sessionId));
         StringBuilder prompt = new StringBuilder(PRE_SYS)
                 .append("\n你必须结合本次会话中的历史消息继续追问，不能重复已经回答过的问题。")
-                .append("如果患者表达了预约/挂号意图，先完成必要的症状与安全确认，再明确告知患者点击‘生成建议’查看可预约号源；不要声称已经替患者预约。\n");
+                .append("如果患者表达了预约/挂号意图，先完成必要的症状与安全确认；信息齐全后由系统自动查询真实号源，")
+                .append("不要要求患者点击生成、刷新或重新分诊，也不要声称已经替患者预约。\n");
         if (session != null && session.get("patient_id") != null) {
             Map<String, Object> profile = db.queryOne(
                     "SELECT name, gender, age, allergic_history, past_history FROM patient_profile WHERE id=:id",

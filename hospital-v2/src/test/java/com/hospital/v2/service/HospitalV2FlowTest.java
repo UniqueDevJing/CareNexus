@@ -35,6 +35,8 @@ class HospitalV2FlowTest {
     @Autowired
     private KnowledgeService knowledge;
     @Autowired
+    private DashboardService dashboard;
+    @Autowired
     private Db db;
 
     @BeforeEach
@@ -45,6 +47,14 @@ class HospitalV2FlowTest {
             db.update("UPDATE doctor_schedule SET work_date=:date WHERE id=:id",
                     Map.of("date", LocalDate.now().plusDays(7L + i), "id", schedules.get(i).get("id")));
         }
+    }
+
+    @Test
+    void dashboard_exposes_patient_effort_and_agent_metrics() {
+        Map<String, Object> overview = dashboard.overview();
+        assertTrue(overview.containsKey("avgConversationTurns"));
+        assertTrue(overview.containsKey("manualInterventionRate"));
+        assertTrue(overview.containsKey("avgAgentLatencyMs"));
     }
 
     @Test

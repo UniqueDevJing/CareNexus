@@ -28,6 +28,12 @@ public class DashboardService {
         m.put("doctorOnline", count("SELECT COUNT(*) c FROM doctor d WHERE EXISTS "
                 + "(SELECT 1 FROM doctor_schedule s WHERE s.doctor_id=d.id AND s.status=1 AND s.remain_num>0)", null));
         m.put("hitRate", hitRate());
+        m.put("avgConversationTurns", decimal("SELECT COALESCE(AVG(turns),0) v FROM "
+                + "(SELECT session_id, COUNT(*) turns FROM pre_triage_message WHERE role='user' GROUP BY session_id) x"));
+        m.put("manualInterventionRate", percentage(
+                count("SELECT COUNT(*) c FROM triage_suggestion WHERE status IN ('PENDING','NEED_MORE_INFO','REJECTED')", null),
+                count("SELECT COUNT(*) c FROM triage_suggestion", null)));
+        m.put("avgAgentLatencyMs", Math.round(decimal("SELECT COALESCE(AVG(cost_ms),0) v FROM agent_run")));
         return m;
     }
 
@@ -78,5 +84,15 @@ public class DashboardService {
         Map<String, Object> p = date == null ? Map.of() : Map.of("t", date);
         Map<String, Object> row = db.queryOne(sql, p);
         return row == null ? 0 : ((Number) row.get("c")).longValue();
+    }
+
+    private double decimal(String sql) {
+        Map<String, Object> row = db.queryOne(sql, Map.of());
+        if (row == null || row.get("v") == null) return 0;
+        return Math.round(((Number) row.get("v")).doubleValue() * 10.0) / 10.0;
+    }
+
+    private double percentage(long value, long total) {
+        return total == 0 ? 0 : Math.round(value * 1000.0 / total) / 10.0;
     }
 }
