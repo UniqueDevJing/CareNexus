@@ -26,6 +26,9 @@
           </div>
           <div class="chat-header-actions"><span class="chat-channel">线上预问诊</span><button v-if="sessionId" class="secondary-button" @click="start">开始新咨询</button></div>
         </header>
+        <div v-if="streaming || suggested" class="agent-trace" aria-live="polite" aria-label="导诊处理进度">
+          <div v-for="step in agentTrace" :key="step.id" :class="['trace-step', step.state]"><span class="trace-dot" aria-hidden="true"></span><div><b>{{ step.label }}</b><small>{{ step.detail }}</small></div></div>
+        </div>
 
         <div ref="box" class="chat-thread">
           <div class="chat-day-divider"><span>今天 · 门诊服务中心</span></div>
@@ -50,10 +53,11 @@
 
       <aside class="patient-rail">
         <article v-if="suggested" :class="['care-result-card', { urgent: sug.red_flag }]">
-          <header><div><span class="eyebrow">就诊建议</span><h3>{{ sug.red_flag ? '请优先人工处理' : sug.status === 'REJECTED' ? '已转人工处理' : needsReview ? '人工核对中' : '建议就诊安排' }}</h3></div></header>
+          <header><div><span class="eyebrow">就诊建议</span><h3>{{ sug.red_flag ? '请优先人工处理' : sug.status === 'REJECTED' ? '已转人工处理' : needsReview ? '人工核对中' : '建议就诊安排' }}</h3></div><div class="result-signal"><span>当前下一步</span><strong>{{ nextActionLabel }}</strong></div></header>
           <div v-if="sug.red_flag" class="urgent-notice"><i aria-hidden="true">!</i><span>检测到危急征象，请优先联系急诊或人工医生。</span></div>
           <div class="result-department"><span>推荐科室</span><strong>{{ sug.department_name || '待人工确认' }}</strong><small>{{ sug.doctor_name || '系统暂未匹配医生' }} · {{ selectedSlot ? `${selectedSlot.work_date} ${selectedSlot.period === 'AM' ? '上午' : '下午'}` : availabilityLabel }}</small></div>
           <div class="result-reason"><span>推荐依据</span><p>{{ sug.reason || '系统未提供额外说明' }}</p></div>
+          <div class="result-metrics"><span><small>证据置信度</small><b>{{ confidenceLabel }}</b></span><span><small>号源状态</small><b>{{ availabilityLabel }}</b></span><span><small>安全边界</small><b>{{ sug.red_flag ? '需人工介入' : '医护最终判断' }}</b></span></div>
           <div v-if="needsReview" class="booking-handoff">
             <div class="handoff-status"><span class="handoff-dot" aria-hidden="true"></span><div><strong>{{ reviewLabel() }}</strong><small>{{ sug.queue_code || '已建立人工任务' }} · {{ updatedLabel() }}</small></div></div>
             <p v-if="sug.manual_question"><b>护士想确认：</b>{{ sug.manual_question }}</p>
@@ -122,6 +126,18 @@ const availabilityLabel = computed(() => {
   if (selectedSlot.value) return `${selectedSlot.value.work_date} ${selectedSlot.value.period === 'AM' ? '上午' : '下午'}`
   return ({ AVAILABLE: '可预约', NO_SLOTS: '暂无号源', PENDING_REVIEW: '等待人工核对', EMERGENCY: '急诊优先' }[sug.value.availability_status] || sug.value.suggested_date || '日期待确认')
 })
+const traceStage = computed(() => {
+  if (!suggested.value) return streaming.value ? 1 : 0
+  if (needsReview.value) return 2
+  return slots.value.length ? 3 : 2
+})
+const agentTrace = computed(() => [
+  { id: 'context', label: '整理症状', detail: traceStage.value > 0 ? '已完成' : '等待输入', state: traceStage.value > 0 ? 'done' : 'pending' },
+  { id: 'safety', label: '检查风险', detail: traceStage.value > 1 ? '已完成' : traceStage.value === 1 ? '处理中' : '等待中', state: traceStage.value > 1 ? 'done' : traceStage.value === 1 ? 'active' : 'pending' },
+  { id: 'resource', label: '匹配资源', detail: traceStage.value >= 3 ? '号源已返回' : needsReview.value ? '等待人工核对' : suggested.value ? '查询号源中' : '等待中', state: traceStage.value >= 3 ? 'done' : traceStage.value === 2 ? 'active' : 'pending' }
+])
+const confidenceLabel = computed(() => { const value = Number(sug.value.confidence); return Number.isFinite(value) && value > 0 ? `${Math.round(value * 100)}%` : '未提供' })
+const nextActionLabel = computed(() => ({ CONTACT_EMERGENCY: '联系急诊', WAIT_FOR_REVIEW: '等待人工核对', CHOOSE_OTHER_SLOT: '刷新或重新匹配', SELECT_SLOT: '选择就诊时间' }[sug.value.next_action] || (registered.value ? '预约已完成' : '补充就诊信息')))
 const showAllSlots = ref(false)
 const displayedSlots = computed(() => showAllSlots.value ? slots.value : slots.value.slice(0, 3))
 const box = ref(null)
