@@ -52,7 +52,7 @@
         <article v-if="suggested" :class="['care-result-card', { urgent: sug.red_flag }]">
           <header><div><span class="eyebrow">就诊建议</span><h3>{{ sug.red_flag ? '请优先人工处理' : sug.status === 'REJECTED' ? '已转人工处理' : needsReview ? '人工核对中' : '建议就诊安排' }}</h3></div></header>
           <div v-if="sug.red_flag" class="urgent-notice"><i aria-hidden="true">!</i><span>检测到危急征象，请优先联系急诊或人工医生。</span></div>
-          <div class="result-department"><span>推荐科室</span><strong>{{ sug.department_name || '待人工确认' }}</strong><small>{{ sug.doctor_name || '系统暂未匹配医生' }} · {{ selectedSlot ? `${selectedSlot.work_date} ${selectedSlot.period === 'AM' ? '上午' : '下午'}` : sug.suggested_date || '日期待确认' }}</small></div>
+          <div class="result-department"><span>推荐科室</span><strong>{{ sug.department_name || '待人工确认' }}</strong><small>{{ sug.doctor_name || '系统暂未匹配医生' }} · {{ selectedSlot ? `${selectedSlot.work_date} ${selectedSlot.period === 'AM' ? '上午' : '下午'}` : availabilityLabel }}</small></div>
           <div class="result-reason"><span>推荐依据</span><p>{{ sug.reason || '系统未提供额外说明' }}</p></div>
           <div v-if="needsReview" class="booking-handoff">
             <div class="handoff-status"><span class="handoff-dot" aria-hidden="true"></span><div><strong>{{ reviewLabel() }}</strong><small>{{ sug.queue_code || '已建立人工任务' }} · {{ updatedLabel() }}</small></div></div>
@@ -68,8 +68,8 @@
               <button v-for="slot in displayedSlots" :key="slot.id" type="button" role="radio" :aria-checked="selectedSlotId === slot.id" :class="['slot-option', { selected: selectedSlotId === slot.id }]" @click="selectedSlotId = slot.id"><strong>{{ slot.work_date }} · {{ slot.period === 'AM' ? '上午' : slot.period === 'PM' ? '下午' : slot.period }}</strong><small>{{ slot.recommendation }} · 余 {{ slot.remain_num }} 个</small></button>
             </div>
             <button v-if="slots.length > 3" type="button" class="secondary-button" @click="showAllSlots = !showAllSlots">{{ showAllSlots ? '收起其他时间' : `查看其他 ${slots.length - 3} 个时间` }}</button>
-            <p v-if="!slots.length">当前没有可约号源，系统稍后会自动更新。</p>
-            <button class="primary-button primary-button--wide" :disabled="!selectedSlotId || busy" @click="doRegister">确认预约所选时间 →</button>
+            <div v-if="!slots.length" class="slot-empty-state"><strong>当前推荐医生暂无可预约号源</strong><p>科室建议仍然有效，但预约需要真实号源。你可以刷新号源，或重新描述需求让系统匹配其他医生。</p><div class="slot-empty-actions"><button type="button" class="secondary-button" :disabled="busy" @click="loadSlots">刷新号源</button><button type="button" class="text-button" :disabled="busy" @click="start">重新匹配</button></div></div>
+            <button v-else class="primary-button primary-button--wide" :disabled="!selectedSlotId || busy" @click="doRegister">确认预约所选时间 →</button>
           </div>
           <button v-else-if="registered" class="primary-button primary-button--wide" disabled>预约已完成</button>
           <div v-else class="booking-handoff">当前暂无可约号源，请稍后重试或联系门诊服务台。</div>
@@ -118,6 +118,10 @@ const reg = ref({})
 const slots = ref([])
 const selectedSlotId = ref(null)
 const selectedSlot = computed(() => slots.value.find(s => s.id === selectedSlotId.value))
+const availabilityLabel = computed(() => {
+  if (selectedSlot.value) return `${selectedSlot.value.work_date} ${selectedSlot.value.period === 'AM' ? '上午' : '下午'}`
+  return ({ AVAILABLE: '可预约', NO_SLOTS: '暂无号源', PENDING_REVIEW: '等待人工核对', EMERGENCY: '急诊优先' }[sug.value.availability_status] || sug.value.suggested_date || '日期待确认')
+})
 const showAllSlots = ref(false)
 const displayedSlots = computed(() => showAllSlots.value ? slots.value : slots.value.slice(0, 3))
 const box = ref(null)

@@ -11,8 +11,11 @@ const AdminModule = () => import('../views/admin/AdminModule.vue')
 const PreTriage = () => import('../views/patient/PreTriage.vue')
 const Records = () => import('../views/patient/Records.vue')
 const MyBills = () => import('../views/patient/MyBills.vue')
+const MyExams = () => import('../views/patient/MyExams.vue')
+const MyPrescriptions = () => import('../views/patient/MyPrescriptions.vue')
 const DoctorConsole = () => import('../views/doctor/DoctorConsole.vue')
 const NurseTriage = () => import('../views/nurse/NurseTriage.vue')
+const Pharmacy = () => import('../views/nurse/Pharmacy.vue')
 const Login = () => import('../views/Login.vue')
 const ContestShowcase = () => import('../views/contest/ContestShowcase.vue')
 
@@ -37,7 +40,10 @@ const routes = [
   { path: '/nurse/triage', name: 'nurseTriage', component: NurseTriage, meta: { group: 'nurse', title: '人工导诊台', tag: 'TRIAGE' } },
   { path: '/patient/pre', name: 'pre', component: PreTriage, meta: { group: 'patient', title: '智能预问诊', tag: 'SSE' } },
   { path: '/patient/records', name: 'records', component: Records, meta: { group: 'patient', title: '我的就诊', tag: 'EMR' } },
-  { path: '/patient/bills', name: 'bills', component: MyBills, meta: { group: 'patient', title: '我的账单', tag: 'PAY' } }
+  { path: '/patient/bills', name: 'bills', component: MyBills, meta: { group: 'patient', title: '我的账单', tag: 'PAY' } },
+  { path: '/patient/exams', name: 'exams', component: MyExams, meta: { group: 'patient', title: '我的检查', tag: 'EXAM' } },
+  { path: '/patient/prescriptions', name: 'prescriptions', component: MyPrescriptions, meta: { group: 'patient', title: '我的处方', tag: 'RX' } },
+  { path: '/nurse/pharmacy', name: 'pharmacy', component: Pharmacy, meta: { group: 'nurse', title: '药房配药', tag: 'RX' } }
 ]
 
 const router = createRouter({

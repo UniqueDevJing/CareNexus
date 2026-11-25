@@ -36,6 +36,25 @@
             <label><span><b>06</b>诊断</span><el-input v-model="emr.diagnosis" :disabled="emr.locked" placeholder="明确或初步诊断" /></label>
             <label><span><b>07</b>处理意见</span><el-input v-model="emr.treatment" :disabled="emr.locked" type="textarea" :rows="3" placeholder="用药、处置、复诊与注意事项" /></label>
           </div>
+          <section class="clinical-orders" aria-label="检查与处方医嘱">
+            <header class="record-form-title"><div><span class="eyebrow">临床医嘱</span><h4>检查与处方</h4></div><span>医嘱会自动生成患者账单</span></header>
+            <div class="order-columns">
+              <div class="order-card">
+                <div class="order-card-head"><strong>开立检查</strong><small>结果由检验人员回填</small></div>
+                <div class="order-fields"><el-input v-model="examForm.itemName" :disabled="emr.locked || orderBusy" placeholder="检查项目，如：血常规" /><el-input v-model="examForm.itemCode" :disabled="emr.locked || orderBusy" placeholder="项目编码（可选）" /><el-input v-model="examForm.fee" :disabled="emr.locked || orderBusy" type="number" min="0" step="0.01" placeholder="费用（元）" /></div>
+                <button class="secondary-button" :disabled="emr.locked || orderBusy" @click="createExam">开立检查</button>
+                <div v-if="exams.length" class="order-list"><div v-for="exam in exams" :key="exam.id" class="order-line"><span>{{ exam.item_name }}</span><small>{{ exam.status === 'RESULT_READY' ? '结果已回填' : exam.bill_status === 'PAID' ? '待检查' : '待支付' }}</small></div></div>
+                <small v-else class="order-empty">本次就诊还没有检查医嘱</small>
+              </div>
+              <div class="order-card">
+                <div class="order-card-head"><strong>开立处方</strong><small>支付后进入药房队列</small></div>
+                <div class="order-fields"><el-input v-model="rxForm.drugName" :disabled="emr.locked || orderBusy" placeholder="药品名称" /><el-input v-model="rxForm.dosage" :disabled="emr.locked || orderBusy" placeholder="用法用量，如：每次1片" /><el-input v-model="rxForm.frequency" :disabled="emr.locked || orderBusy" placeholder="频次，如：每日2次" /><el-input v-model="rxForm.days" :disabled="emr.locked || orderBusy" type="number" min="1" max="365" placeholder="天数" /><el-input v-model="rxForm.quantity" :disabled="emr.locked || orderBusy" type="number" min="0.01" step="0.01" placeholder="数量" /><el-input v-model="rxForm.unitPrice" :disabled="emr.locked || orderBusy" type="number" min="0" step="0.01" placeholder="单价（元）" /></div>
+                <button class="secondary-button" :disabled="emr.locked || orderBusy" @click="createPrescription">开立处方</button>
+                <div v-if="prescriptions.length" class="order-list"><div v-for="rx in prescriptions" :key="rx.id" class="order-line"><span>处方 #{{ rx.id }}</span><small>{{ rx.bill_status === 'PAID' ? '已支付' : '待支付' }} · ¥{{ rx.total_amount }}</small></div></div>
+                <small v-else class="order-empty">本次就诊还没有处方</small>
+              </div>
+            </div>
+          </section>
           <footer class="record-actions"><span>{{ emr.locked ? '病历已提交并锁定，患者端将在归档后可见。' : '提交后病历将锁定，无法再次编辑。' }}</span><div><button v-if="!emr.id && !emr.locked" class="text-button" @click="finish(activePatient)">直接结诊</button><button v-if="!emr.locked" class="secondary-button" @click="saveDraft">保存草稿</button><button v-if="!emr.locked" class="primary-button" @click="submit">提交并完成接诊 <span aria-hidden="true">→</span></button></div></footer>
         </template>
         <div v-else class="canvas-placeholder"><div class="medical-cross" aria-hidden="true">+</div><span class="eyebrow">接诊桌已准备</span><h3>从左侧选择一位患者</h3><p>患者健康背景、风险提示与结构化病历将在这里展开。</p></div>
@@ -59,6 +78,11 @@ let detailSequence = 0
 const visibleRegs = computed(() => queueFilter.value === 'all' ? regs.value : regs.value.filter(r => queueFilter.value === 'done' ? r.status === 'DONE' : r.status !== 'DONE'))
 const recordSections = ['主诉', '现病史', '既往史', '过敏史', '检查', '诊断', '处理']
 const emr = reactive({ locked: false, id: null, registrationId: null, chief_complaint: '', present_illness: '', past_history: '', allergy_history: '', assistant_exam: '', diagnosis: '', treatment: '' })
+const exams = ref([])
+const prescriptions = ref([])
+const orderBusy = ref(false)
+const examForm = reactive({ itemName: '', itemCode: '', fee: '' })
+const rxForm = reactive({ drugName: '', dosage: '', frequency: '', days: '3', quantity: '1', unitPrice: '0' })
 
 onMounted(load)
 async function load() { regs.value = await api.get('/doctor/registrations') }
@@ -69,12 +93,49 @@ async function openEmr(row) {
   emr.id = row.record_id || null; emr.registrationId = row.registration_id
   for (const key of ['chief_complaint', 'present_illness', 'assistant_exam', 'diagnosis', 'treatment']) emr[key] = ''
   emr.past_history = row.past_history || ''; emr.allergy_history = row.allergic_history || ''
-  if (!row.record_id) return
+  exams.value = []; prescriptions.value = []
+  resetOrderForms()
+  if (row.record_id) {
+    try {
+      const record = await api.get('/doctor/record', { recordId: row.record_id })
+      if (sequence !== detailSequence) return
+      for (const key of ['chief_complaint', 'present_illness', 'past_history', 'allergy_history', 'assistant_exam', 'diagnosis', 'treatment']) emr[key] = record[key] || ''
+    } catch { if (sequence === detailSequence) emr.locked = true; ElMessage.error('病历加载失败，请重新选择患者') }
+  }
+  await loadOrders(row.registration_id, sequence)
+}
+async function loadOrders(registrationId, sequence = detailSequence) {
   try {
-    const record = await api.get('/doctor/record', { recordId: row.record_id })
-    if (sequence !== detailSequence) return
-    for (const key of ['chief_complaint', 'present_illness', 'past_history', 'allergy_history', 'assistant_exam', 'diagnosis', 'treatment']) emr[key] = record[key] || ''
-  } catch { if (sequence === detailSequence) emr.locked = true; ElMessage.error('病历加载失败，请重新选择患者') }
+    const [examRows, prescriptionRows] = await Promise.all([
+      api.get('/doctor/exam-orders', { registrationId }),
+      api.get('/doctor/prescriptions', { registrationId })
+    ])
+    if (sequence === detailSequence) { exams.value = examRows; prescriptions.value = prescriptionRows }
+  } catch (e) { if (sequence === detailSequence) ElMessage.error(e.response?.data?.msg || e.message || '医嘱加载失败') }
+}
+function resetOrderForms() {
+  Object.assign(examForm, { itemName: '', itemCode: '', fee: '' })
+  Object.assign(rxForm, { drugName: '', dosage: '', frequency: '', days: '3', quantity: '1', unitPrice: '0' })
+}
+async function createExam() {
+  if (orderBusy.value || emr.locked || !emr.registrationId) return
+  if (!examForm.itemName.trim() || Number(examForm.fee) < 0) return ElMessage.warning('请填写检查项目和有效费用')
+  orderBusy.value = true
+  try {
+    await api.post('/doctor/exam-orders', null, { registrationId: emr.registrationId, patientId: currentPatientId(), itemName: examForm.itemName, itemCode: examForm.itemCode, fee: examForm.fee })
+    ElMessage.success('检查医嘱已开立'); resetOrderForms(); await loadOrders(emr.registrationId)
+  } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '检查医嘱开立失败') }
+  finally { orderBusy.value = false }
+}
+async function createPrescription() {
+  if (orderBusy.value || emr.locked || !emr.registrationId) return
+  if (!rxForm.drugName.trim() || !rxForm.dosage.trim() || !rxForm.frequency.trim() || Number(rxForm.days) < 1 || Number(rxForm.quantity) <= 0 || Number(rxForm.unitPrice) < 0) return ElMessage.warning('请完整填写药品、用法、频次、天数、数量和单价')
+  orderBusy.value = true
+  try {
+    await api.post('/doctor/prescriptions', null, { registrationId: emr.registrationId, patientId: currentPatientId(), items: [{ drugName: rxForm.drugName, dosage: rxForm.dosage, frequency: rxForm.frequency, days: rxForm.days, quantity: rxForm.quantity, unitPrice: rxForm.unitPrice }] })
+    ElMessage.success('处方已开立'); resetOrderForms(); await loadOrders(emr.registrationId)
+  } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '处方开立失败') }
+  finally { orderBusy.value = false }
 }
 function sectionFilled(index) { return Boolean(emr[['chief_complaint', 'present_illness', 'past_history', 'allergy_history', 'assistant_exam', 'diagnosis', 'treatment'][index]]) }
 async function saveDraft() {

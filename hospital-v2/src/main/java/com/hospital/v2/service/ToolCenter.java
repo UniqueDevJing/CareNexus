@@ -9,14 +9,16 @@ import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * 数据库驱动 MCP 工具中心。
- * - 运行时按 mcp_tool 表 enabled=1 现查现建工具池（关了模型下一次真的调不到）。
- * - 工具调用统一走 execute()，成功/失败都写 mcp_tool_call_log。
+ * 受控工具中心。
+ * 工具的参数契约由代码固定，数据库只保留管理员启停开关；这样不会因为一条
+ * 配置记录缺少参数定义而让 Agent 失去可调用工具，执行日志仍统一写入审计表。
  */
 @Service
 public class ToolCenter {
@@ -30,19 +32,40 @@ public class ToolCenter {
         this.props = props;
     }
 
-    /** 读取启用的工具，构建给模型的 ToolSpecification 列表。 */
+    /** 构建稳定的工具契约，再应用管理员的启停开关。 */
     public List<ToolSpecification> buildSpecs() {
-        List<Map<String, Object>> tools = db.query(
-                "SELECT tool_code, name, description FROM mcp_tool WHERE enabled=1 ORDER BY sort", Map.of());
-        List<ToolSpecification> specs = new ArrayList<>();
-        for (Map<String, Object> t : tools) {
-            specs.add(ToolSpecification.builder()
-                    .name(String.valueOf(t.get("tool_code")))
-                    .description(String.valueOf(t.get("description")))
-                    .parameters(JsonObjectSchema.builder().build())
-                    .build());
+        Map<String, ToolSpecification> registry = new LinkedHashMap<>();
+        registry.put("symptom_tag_search", ToolSpecification.builder()
+                .name("symptom_tag_search").description("根据症状关键词搜索症状标签和推荐科室")
+                .parameters(JsonObjectSchema.builder().addStringProperty("keyword", "症状关键词").build()).build());
+        registry.put("department_query", ToolSpecification.builder()
+                .name("department_query").description("按关键词查询医院科室信息")
+                .parameters(JsonObjectSchema.builder().addStringProperty("keyword", "科室名称或症状关键词").build()).build());
+        registry.put("doctor_query", ToolSpecification.builder()
+                .name("doctor_query").description("查询指定科室的医生列表及其擅长方向")
+                .parameters(JsonObjectSchema.builder().addIntegerProperty("department_id", "科室ID")
+                        .addStringProperty("title", "医生职称筛选，可选").build()).build());
+        registry.put("schedule_query", ToolSpecification.builder()
+                .name("schedule_query").description("查询指定医生在指定日期的可用号源")
+                .parameters(JsonObjectSchema.builder().addIntegerProperty("doctor_id", "医生ID")
+                        .addStringProperty("work_date", "日期 yyyy-MM-dd")
+                        .addStringProperty("period", "AM/PM，可选").build()).build());
+        registry.put("knowledge_retrieve", ToolSpecification.builder()
+                .name("knowledge_retrieve").description("检索与分诊相关的循证知识片段")
+                .parameters(JsonObjectSchema.builder().addStringProperty("query", "检索问题")
+                        .addIntegerProperty("top_k", "返回数量，可选").build()).build());
+
+        try {
+            List<Map<String, Object>> enabledRows = db.query(
+                    "SELECT tool_code FROM mcp_tool WHERE enabled=1 ORDER BY sort", Map.of());
+            Set<String> enabled = new LinkedHashSet<>();
+            for (Map<String, Object> row : enabledRows) enabled.add(String.valueOf(row.get("tool_code")));
+            return registry.entrySet().stream()
+                    .filter(entry -> enabled.contains(entry.getKey())).map(Map.Entry::getValue).toList();
+        } catch (RuntimeException ignored) {
+            // 兼容旧库或精简库：工具契约仍可工作，管理员开关在迁移完成后恢复。
         }
-        return specs;
+        return new ArrayList<>(registry.values());
     }
 
     /** 执行工具：解析入参 → 分发 → 记日志 → 返回结果文本。 */
@@ -55,7 +78,6 @@ public class ToolCenter {
                 case "department_query" -> departmentQuery(str(args, "keyword"));
                 case "doctor_query" -> doctorQuery(num(args, "department_id"), str(args, "title"));
                 case "schedule_query" -> scheduleQuery(num(args, "doctor_id"), str(args, "work_date"), str(args, "period"));
-                case "patient_profile_query" -> patientQuery(num(args, "patient_id"));
                 case "symptom_tag_search" -> symptomSearch(str(args, "keyword"));
                 case "knowledge_retrieve" -> knowledgeRetrieve(str(args, "query"), num(args, "top_k"));
                 default -> throw new IllegalArgumentException("未知工具: " + toolCode);
@@ -133,13 +155,6 @@ public class ToolCenter {
         if (s.equals("MORNING") || s.contains("上午") || s.equals("AM")) return "AM";
         if (s.equals("AFTERNOON") || s.contains("下午") || s.equals("PM")) return "PM";
         return period.trim();
-    }
-
-    private String patientQuery(Long patientId) {
-        Map<String, Object> p = Map.of("pid", patientId);
-        Map<String, Object> row = db.queryOne(
-                "SELECT id, name, gender, age, allergic_history, past_history FROM patient_profile WHERE id=:pid", p);
-        return JsonUtils.toJson(row == null ? Map.of("found", false) : row);
     }
 
     private String symptomSearch(String kw) {

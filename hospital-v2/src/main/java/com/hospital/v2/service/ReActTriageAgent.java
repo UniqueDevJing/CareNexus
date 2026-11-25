@@ -171,6 +171,13 @@ public class ReActTriageAgent {
         suggestion.put("needs_confirmation", needsConfirmation);
         suggestion.put("can_register", !needsConfirmation && date != null);
         suggestion.put("suggested_date", date == null ? "" : date);
+        // 把“临床建议”和“运营号源”拆成一个明确状态，避免患者把推荐科室误解为已可预约。
+        suggestion.put("availability_status", redFlag ? "EMERGENCY"
+                : needsConfirmation ? "PENDING_REVIEW"
+                : date == null ? "NO_SLOTS" : "AVAILABLE");
+        suggestion.put("next_action", redFlag ? "CONTACT_EMERGENCY"
+                : needsConfirmation ? "WAIT_FOR_REVIEW"
+                : date == null ? "CHOOSE_OTHER_SLOT" : "SELECT_SLOT");
 
         // 落库：triage_suggestion
         Map<String, Object> ins = new LinkedHashMap<>();
