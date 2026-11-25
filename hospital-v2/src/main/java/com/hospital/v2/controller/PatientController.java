@@ -196,11 +196,18 @@ public class PatientController {
         return Result.ok(r.suggestion());
     }
 
+    @GetMapping("/available-slots")
+    public Result<?> availableSlots(@RequestParam long suggestionId, @AuthenticationPrincipal AuthPrincipal principal) {
+        currentUser.assertPatientOwnsSuggestion(principal, suggestionId);
+        return Result.ok(registration.availableSlots(suggestionId, currentUser.patientId(principal, null)));
+    }
+
     @PostMapping("/register")
-    public Result<?> register(@RequestParam long suggestionId, @RequestParam(required = false) Long patientId,
+    public Result<?> register(@RequestParam long suggestionId, @RequestParam(required = false) Long scheduleId,
+                              @RequestParam(required = false) Long patientId,
                               @AuthenticationPrincipal AuthPrincipal principal) {
         currentUser.assertPatientOwnsSuggestion(principal, suggestionId);
-        return Result.ok(registration.register(suggestionId, currentUser.patientId(principal, patientId)));
+        return Result.ok(registration.register(suggestionId, currentUser.patientId(principal, patientId), scheduleId));
     }
 
     @GetMapping("/registrations")

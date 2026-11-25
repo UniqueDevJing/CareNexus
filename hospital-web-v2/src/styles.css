@@ -215,6 +215,15 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .care-safety-card li i { width: 5px; height: 5px; flex: 0 0 auto; margin-top: 7px; background: var(--teal); border-radius: 50%; }
 .care-result-card { border-color: #c8d8d0; }
 .care-result-card.urgent { border-color: #e0bdb2; background: #fffaf6; }
+.slot-picker { display: grid; gap: 12px; margin-top: 18px; }
+.slot-picker-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.slot-picker-heading strong { font-size: 14px; }
+.slot-list { display: grid; gap: 8px; max-height: 210px; overflow-y: auto; }
+.slot-option { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; }
+.slot-option:hover, .slot-option:focus-visible { border-color: #8bb7a9; }
+.slot-option.selected { border-color: #328475; background: #edf7f2; }
+.slot-option strong { font-size: 13px; }
+.slot-option small { flex: none; color: var(--ink-soft); }
 .care-result-card > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .care-result-card h3 { margin: 6px 0 0; font: 500 21px/1.2 var(--display); letter-spacing: -.04em; }
 .confidence { display: grid; width: 43px; height: 43px; place-items: center; color: var(--teal-dark); border: 1px solid #b9d4c9; border-radius: 50%; background: var(--sage); font: 600 11px/1 var(--mono); }

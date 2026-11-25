@@ -50,6 +50,18 @@ class ConcurrencyAndRecordTest {
             assertThrows(BizException.class,()->registrations.register(id,1L));
         }
     }
+    @Test void selected_slot_must_belong_to_confirmed_doctor_and_patient() {
+        long own = suggestion(1);
+        long slot = db.insert("INSERT INTO doctor_schedule(doctor_id,department_id,work_date,period,total_num,remain_num,status) VALUES(1,1,:date,'PM',2,2,1)", Map.of("date", LocalDate.now().plusDays(10)));
+        long otherDoctor = db.insert("INSERT INTO doctor_schedule(doctor_id,department_id,work_date,period,total_num,remain_num,status) VALUES(2,1,:date,'PM',2,2,1)", Map.of("date", LocalDate.now().plusDays(11)));
+        assertThrows(BizException.class, () -> registrations.availableSlots(own, 2L));
+        assertThrows(BizException.class, () -> registrations.register(own, 1L, otherDoctor));
+        assertEquals(2, ((Number) db.queryOne("SELECT remain_num FROM doctor_schedule WHERE id=:id", Map.of("id", otherDoctor)).get("remain_num")).intValue());
+        assertTrue(registrations.availableSlots(own, 1L).stream().anyMatch(row -> ((Number) row.get("id")).longValue() == slot));
+        assertEquals("PM", registrations.register(own, 1L, slot).get("period"));
+        assertEquals(1, ((Number) db.queryOne("SELECT remain_num FROM doctor_schedule WHERE id=:id", Map.of("id", slot)).get("remain_num")).intValue());
+        assertThrows(BizException.class, () -> registrations.register(own, 1L, slot));
+    }
     @Test void record_is_unique_and_submission_locks_both_record_and_visit() {
         long registration=db.insert("INSERT INTO registration(patient_id,department_id,doctor_id,schedule_id,work_date,period,status,payment_status) VALUES(1,1,1,1,:date,'PM','PAID','PAID')",Map.of("date",LocalDate.now().plusDays(101)));
         Map<String,Object> body=new HashMap<>(Map.of("registration_id",registration,"patient_id",1,"doctor_id",1,"chief_complaint","测试"));

@@ -22,9 +22,9 @@
         <header class="chat-header">
           <div class="care-contact">
             <span class="care-avatar care-avatar--triage" aria-hidden="true"><i></i></span>
-            <div><strong>门诊导诊助手</strong><small><i></i>{{ sessionId ? `会话 #${sessionId} · 已建立` : '准备好听你描述' }}</small></div>
+            <div><strong>门诊导诊助手</strong><small><i></i>{{ sessionId ? `会话 #${sessionId} · 已建立` : '直接描述需求即可开始' }}</small></div>
           </div>
-          <div class="chat-header-actions"><span class="chat-channel">线上预问诊</span><button class="secondary-button" @click="start">{{ sessionId ? '重新开始' : '开始对话' }}</button></div>
+          <div class="chat-header-actions"><span class="chat-channel">线上预问诊</span><button v-if="sessionId" class="secondary-button" @click="start">重新开始</button></div>
         </header>
 
         <div ref="box" class="chat-thread">
@@ -33,7 +33,6 @@
             <div class="chat-empty-mark" aria-hidden="true"><span></span><i></i></div>
             <div><span class="eyebrow">先从最困扰你的地方开始</span><h3>你现在最想解决什么问题？</h3><p>可以告诉我身体部位、出现时间、严重程度，以及有没有发热、胸闷等变化。</p></div>
             <div class="starter-prompts"><button type="button" @click="input = '我从昨晚开始胸闷，活动后更明显'">胸闷 / 呼吸不适</button><button type="button" @click="input = '这两天一直发热，伴有咳嗽'">发热 / 咳嗽</button><button type="button" @click="input = '我最近反复胃痛，饭后更明显'">腹痛 / 消化不适</button></div>
-            <button v-if="!sessionId" class="primary-button" @click="start">开始安全预问诊 <span aria-hidden="true">→</span></button>
           </div>
 
           <div v-for="(m, i) in msgs" :key="i" :class="['message-row', m.role]">
@@ -44,8 +43,8 @@
         </div>
 
         <footer class="chat-composer">
-          <textarea v-model="input" rows="2" :disabled="!sessionId || locked || streaming" placeholder="例如：从昨晚开始持续胸闷，活动后更明显……" @keydown.enter.exact.prevent="send"></textarea>
-          <div class="composer-footer"><span>{{ locked ? '本次会话已结束，可以重新开始新的预问诊' : needsReview ? '建议先等待人工复核，也可以继续补充信息' : streaming ? '正在整理你的描述…' : 'Enter 发送 · Shift + Enter 换行' }}</span><div class="composer-actions"><button class="secondary-button" :disabled="!sessionId || locked || streaming || (suggested && !needsReview)" @click="doTriage">{{ needsReview ? '补充后重新分诊' : '生成就诊建议' }}</button><button class="send-button" :disabled="!sessionId || locked || streaming || !input.trim()" @click="send">发送 <span aria-hidden="true">↑</span></button></div></div>
+          <textarea v-model="input" rows="2" :disabled="locked || streaming || busy" placeholder="例如：咳嗽三天，想约明天下午的门诊……" @keydown.enter.exact.prevent="send"></textarea>
+          <div class="composer-footer"><span>{{ locked ? '本次会话已结束，可以重新开始新的预问诊' : needsReview ? '建议先等待人工复核，也可以继续补充信息' : streaming ? '正在整理你的描述…' : 'Enter 发送 · Shift + Enter 换行' }}</span><div class="composer-actions"><button class="secondary-button" :disabled="!sessionId || locked || streaming || busy || (suggested && !needsReview)" @click="doTriage">{{ needsReview ? '补充后重新分诊' : '查看就诊安排' }}</button><button class="send-button" :disabled="locked || streaming || busy || !input.trim()" @click="send">发送 <span aria-hidden="true">↑</span></button></div></div>
         </footer>
       </article>
 
@@ -53,7 +52,7 @@
         <article v-if="suggested" :class="['care-result-card', { urgent: sug.red_flag }]">
           <header><div><span class="eyebrow">就诊建议</span><h3>{{ sug.red_flag ? '请优先人工处理' : sug.status === 'REJECTED' ? '已转人工处理' : needsReview ? '人工核对中' : '建议就诊安排' }}</h3></div><span class="confidence">{{ Math.round((sug.confidence || 0) * 100) }}%</span></header>
           <div v-if="sug.red_flag" class="urgent-notice"><i aria-hidden="true">!</i><span>检测到危急征象，请优先联系急诊或人工医生。</span></div>
-          <div class="result-department"><span>推荐科室</span><strong>{{ sug.department_name || '待人工确认' }}</strong><small>{{ sug.doctor_name || '系统暂未匹配医生' }} · {{ sug.suggested_date || '日期待确认' }}</small></div>
+          <div class="result-department"><span>推荐科室</span><strong>{{ sug.department_name || '待人工确认' }}</strong><small>{{ sug.doctor_name || '系统暂未匹配医生' }} · {{ selectedSlot ? `${selectedSlot.work_date} ${selectedSlot.period === 'AM' ? '上午' : '下午'}` : sug.suggested_date || '日期待确认' }}</small></div>
           <div class="result-reason"><span>推荐依据</span><p>{{ sug.reason || '系统未提供额外说明' }}</p></div>
           <div v-if="needsReview" class="booking-handoff">
             <div class="handoff-status"><span class="handoff-dot" aria-hidden="true"></span><div><strong>{{ reviewLabel() }}</strong><small>{{ sug.queue_code || '已建立人工任务' }} · {{ updatedLabel() }}</small></div></div>
@@ -63,7 +62,16 @@
             <button class="secondary-button" :disabled="refreshing" @click="refreshReview()">{{ refreshing ? '刷新中…' : '刷新人工状态' }}</button>
           </div>
           <div v-else-if="sug.status === 'REJECTED'" class="booking-handoff booking-handoff--warning"><strong>当前建议未进入预约</strong><p>系统无法安全确认本次安排，已转人工处理。请继续补充症状，或联系门诊服务台。</p></div>
-          <button v-else class="primary-button primary-button--wide" :disabled="registered || sug.can_register === false" @click="doRegister">{{ registered ? '预约已完成' : sug.can_register === false ? '当前暂无可约号源' : '确认并预约挂号' }} <span v-if="!registered" aria-hidden="true">→</span></button>
+          <div v-else-if="!registered && sug.can_register !== false" class="slot-picker">
+            <div class="slot-picker-heading"><strong>可约时间</strong><button type="button" class="secondary-button" @click="loadSlots">刷新号源</button></div>
+            <div v-if="slots.length" class="slot-list" role="radiogroup" aria-label="选择就诊时间">
+              <button v-for="slot in slots" :key="slot.id" type="button" role="radio" :aria-checked="selectedSlotId === slot.id" :class="['slot-option', { selected: selectedSlotId === slot.id }]" @click="selectedSlotId = slot.id"><strong>{{ slot.work_date }} · {{ slot.period === 'AM' ? '上午' : slot.period === 'PM' ? '下午' : slot.period }}</strong><small>余 {{ slot.remain_num }} 个</small></button>
+            </div>
+            <p v-else>当前没有可约号源，请刷新后重试。</p>
+            <button class="primary-button primary-button--wide" :disabled="!selectedSlotId || busy" @click="doRegister">确认预约所选时间 →</button>
+          </div>
+          <button v-else-if="registered" class="primary-button primary-button--wide" disabled>预约已完成</button>
+          <div v-else class="booking-handoff">当前暂无可约号源，请稍后重试或联系门诊服务台。</div>
           <div v-if="registered" class="booking-proof"><small>预约凭证 · {{ reg.work_date }} {{ reg.period }}</small><span v-if="reg.payment_status !== 'PAID'">挂号已保留，完成支付后进入正式接诊</span><router-link v-if="reg.payment_status !== 'PAID'" to="/patient/bills">去账单支付 →</router-link></div>
         </article>
 
@@ -91,7 +99,7 @@
 </template>
 
 <script setup>
-import { ref, nextTick, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, computed, nextTick, reactive, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '../../api'
 import { createSseParser } from '../../sse'
@@ -106,6 +114,9 @@ const needsReview = ref(false)
 const sug = ref({})
 const registered = ref(false)
 const reg = ref({})
+const slots = ref([])
+const selectedSlotId = ref(null)
+const selectedSlot = computed(() => slots.value.find(s => s.id === selectedSlotId.value))
 const box = ref(null)
 const saving = ref(false)
 const refreshing = ref(false)
@@ -125,7 +136,7 @@ async function restoreSession() {
     const data = await api.get('/patient/session/history', { sessionId: Number(saved) })
     if (disposed || sessionId.value !== previousSession) return true
     sessionId.value = data.sessionId; locked.value = Number(data.locked) === 1 || data.status === 'LOCKED'; msgs.value = (data.messages || []).map(m => ({ role: m.role === 'assistant' ? 'bot' : 'user', text: m.content }))
-    if (data.suggestion) { sug.value = data.suggestion; suggested.value = true; needsReview.value = !!data.suggestion.needs_confirmation; registered.value = Number(data.suggestion.registered) === 1 || !!data.registration; if (data.registration) reg.value = data.registration; lastUpdated.value = new Date() }
+    if (data.suggestion) { sug.value = data.suggestion; suggested.value = true; needsReview.value = !!data.suggestion.needs_confirmation; registered.value = Number(data.suggestion.registered) === 1 || !!data.registration; if (data.registration) reg.value = data.registration; lastUpdated.value = new Date(); if (!needsReview.value && !registered.value && data.suggestion.status === 'CONFIRMED') await loadSlots() }
     scroll()
     return true
   } catch { localStorage.removeItem('carenexus_pretriage_session'); return false }
@@ -136,15 +147,16 @@ onMounted(async () => {
 })
 onUnmounted(() => { disposed = true; chatAbort?.abort(); window.clearInterval(statusTimer) })
 function scroll() { nextTick(() => { if (box.value) box.value.scrollTop = box.value.scrollHeight }) }
-async function startRequest() { const r = await api.post('/patient/session'); sessionId.value = r.sessionId; localStorage.setItem('carenexus_pretriage_session', String(r.sessionId)); msgs.value = []; locked.value = false; suggested.value = false; needsReview.value = false; registered.value = false; sug.value = {}; lastUpdated.value = null; ElMessage.success('就诊对话已建立') }
+async function startRequest() { const r = await api.post('/patient/session'); sessionId.value = r.sessionId; localStorage.setItem('carenexus_pretriage_session', String(r.sessionId)); msgs.value = []; locked.value = false; suggested.value = false; needsReview.value = false; registered.value = false; sug.value = {}; slots.value = []; selectedSlotId.value = null; lastUpdated.value = null }
 async function start() {
   if (busy.value || streaming.value || refreshing.value || disposed) return
   busy.value = true
   try { await startRequest() } finally { busy.value = false }
 }
 async function send() {
-  if (busy.value || refreshing.value || disposed || locked.value || !sessionId.value) return
+  if (busy.value || refreshing.value || disposed || locked.value) return
   const text = input.value.trim(); if (!text || streaming.value) return
+  if (!sessionId.value) { busy.value = true; try { await startRequest() } catch (e) { ElMessage.error(e.response?.data?.msg || '暂时无法开始对话'); return } finally { busy.value = false } }
   msgs.value.push({ role: 'user', text }); input.value = ''; streaming.value = true
   const assistant = { role: 'bot', text: '', typing: true }; msgs.value.push(assistant); scroll()
   let delivered = false
@@ -162,7 +174,16 @@ async function send() {
   if (delivered && needsReview.value && sug.value.status === 'NEED_MORE_INFO') { sug.value = { ...sug.value, status: 'PENDING', manual_question: '' } }
   streaming.value = false
 }
-async function doTriageRequest() { const complaint = input.value.trim() || msgs.value.filter(m => m.role === 'user').map(m => m.text).join('，'); if (!complaint) { ElMessage.warning('请先描述症状'); return } try { const result = await api.post('/patient/triage', { sessionId: sessionId.value, complaint }); sug.value = result; suggested.value = true; needsReview.value = !!result.needs_confirmation; locked.value = !needsReview.value || Number(result.red_flag) === 1; lastUpdated.value = new Date() } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '暂时无法生成就诊建议') } }
+async function doTriageRequest() { const complaint = input.value.trim() || msgs.value.filter(m => m.role === 'user').map(m => m.text).join('，'); if (!complaint) { ElMessage.warning('请先描述症状'); return } try { const result = await api.post('/patient/triage', { sessionId: sessionId.value, complaint }); sug.value = result; suggested.value = true; needsReview.value = !!result.needs_confirmation; locked.value = !needsReview.value || Number(result.red_flag) === 1; lastUpdated.value = new Date(); if (!needsReview.value && result.can_register) await loadSlots() } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '暂时无法生成就诊建议') } }
+function preferredSlot(available) {
+  const requests = msgs.value.filter(m => m.role === 'user').map(m => m.text).reverse()
+  const periodWords = requests.find(text => /下午|午后|上午|早上/.test(text)) || ''
+  const period = /下午|午后/.test(periodWords) ? 'PM' : /上午|早上/.test(periodWords) ? 'AM' : null
+  const tomorrow = requests.some(text => /明天/.test(text)) ? new Date(Date.now() + 86400000) : null
+  const date = tomorrow ? `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}` : null
+  return available.find(s => (!period || s.period === period) && (!date || s.work_date === date)) || available[0]
+}
+async function loadSlots() { if (!sug.value.suggestion_id) return; try { slots.value = await api.get('/patient/available-slots', { suggestionId: sug.value.suggestion_id }); if (!slots.value.some(s => s.id === selectedSlotId.value)) selectedSlotId.value = preferredSlot(slots.value)?.id || null } catch (e) { slots.value = []; selectedSlotId.value = null; ElMessage.error(e.response?.data?.msg || '暂时无法查询号源') } }
 async function doTriage() {
   if (busy.value || streaming.value || refreshing.value || disposed) return
   busy.value = true
@@ -175,7 +196,7 @@ async function refreshReview(silent = false) {
   catch (e) { if (!silent) ElMessage.error('暂时无法刷新人工处理状态') }
   finally { refreshing.value = false }
 }
-async function doRegisterRequest() { try { reg.value = await api.post('/patient/register', { suggestionId: sug.value.suggestion_id }); registered.value = true; ElMessage.success(`预约成功：${reg.value.work_date} ${reg.value.period}`) } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '预约失败，号源可能刚刚被占用') } }
+async function doRegisterRequest() { if (!selectedSlotId.value) return; try { reg.value = await api.post('/patient/register', { suggestionId: sug.value.suggestion_id, scheduleId: selectedSlotId.value }); registered.value = true; ElMessage.success(`预约成功：${reg.value.work_date} ${reg.value.period}`) } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '预约失败，号源可能刚刚被占用'); await loadSlots() } }
 async function doRegister() {
   if (busy.value || streaming.value || refreshing.value || disposed) return
   busy.value = true
