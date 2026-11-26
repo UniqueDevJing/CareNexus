@@ -34,19 +34,17 @@
         <div class="login-panel-heading">
           <span class="login-panel-label">进入门诊工作台</span>
           <h2>{{ mode === 'login' ? '欢迎回来' : '建立患者档案' }}</h2>
-          <p>{{ mode === 'login' ? '请选择你的工作身份，继续今天的就诊流程。' : '创建账号后，可以保存健康档案和就诊记录。' }}</p>
+          <p>{{ mode === 'login' ? '从一句话开始，系统只在需要时邀请医护接手。' : '建立档案后，你的症状、安排和记录可以被连续保存。' }}</p>
         </div>
 
-        <div class="identity-strip" aria-label="支持的工作身份">
-          <span><i class="identity-dot identity-dot--patient">患</i>患者</span>
-          <span><i class="identity-dot identity-dot--nurse">导</i>护士</span>
-          <span><i class="identity-dot identity-dot--doctor">医</i>医生</span>
-          <span><i class="identity-dot identity-dot--admin">运</i>运营</span>
+        <div class="identity-strip" aria-label="服务范围">
+          <span><i class="identity-dot identity-dot--patient">患</i><b>患者优先</b></span>
+          <span class="identity-note">医生、护士和运营人员从专用入口处理需要人工判断的事项</span>
         </div>
 
         <div class="login-tabs" role="tablist" aria-label="登录或注册">
-          <button :class="{ active: mode === 'login' }" role="tab" :aria-selected="mode === 'login'" @click="mode = 'login'">登录工作台</button>
-          <button :class="{ active: mode === 'register' }" role="tab" :aria-selected="mode === 'register'" @click="mode = 'register'">患者注册</button>
+          <button :class="{ active: mode === 'login' }" role="tab" :aria-selected="mode === 'login'" @click="mode = 'login'">进入服务</button>
+          <button :class="{ active: mode === 'register' }" role="tab" :aria-selected="mode === 'register'" @click="mode = 'register'">建立档案</button>
         </div>
 
         <form class="login-form" @submit.prevent="submit">
@@ -57,7 +55,7 @@
             <label>手机号（可选）<input v-model="form.phone" autocomplete="tel" placeholder="用于就诊联系"></label>
           </template>
           <button class="login-submit" type="submit" :disabled="loading">
-            <span>{{ loading ? '正在验证…' : mode === 'login' ? '进入我的工作台' : '创建患者账号' }}</span>
+            <span>{{ loading ? '正在验证…' : mode === 'login' ? '开始我的就诊准备' : '建立患者档案' }}</span>
             <b aria-hidden="true">→</b>
           </button>
         </form>

@@ -14,7 +14,6 @@ test('patient → nurse → booking → payment → doctor record → patient re
   try {
     await login(patient,'patient')
     await expect(patient).toHaveURL(/patient\/pre/)
-    await patient.getByRole('button',{name:'开始对话',exact:true}).click()
     await patient.locator('textarea').first().fill('咳嗽一周，没有其他不适')
     await patient.getByRole('button',{name:'发送',exact:false}).click()
     await expect(patient.getByRole('button',{name:'生成就诊建议',exact:true})).toBeEnabled()

@@ -35,7 +35,7 @@
           <div v-if="!msgs.length" class="chat-empty">
             <div class="chat-empty-mark" aria-hidden="true"><span></span><i></i></div>
             <div><span class="eyebrow">先从最困扰你的地方开始</span><h3>你现在最想解决什么问题？</h3><p>可以告诉我身体部位、出现时间、严重程度，以及有没有发热、胸闷等变化。</p></div>
-            <div class="starter-prompts"><button type="button" @click="input = '我从昨晚开始胸闷，活动后更明显'">胸闷 / 呼吸不适</button><button type="button" @click="input = '这两天一直发热，伴有咳嗽'">发热 / 咳嗽</button><button type="button" @click="input = '我最近反复胃痛，饭后更明显'">腹痛 / 消化不适</button></div>
+            <div class="starter-prompts"><button v-for="prompt in starterPrompts" :key="prompt.label" type="button" @click="input = prompt.value">{{ prompt.label }}</button></div>
           </div>
 
           <div v-for="(m, i) in msgs" :key="i" :class="['message-row', m.role]">
@@ -108,6 +108,7 @@ import { ref, computed, nextTick, reactive, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '../../api'
 import { createSseParser } from '../../sse'
+import { availabilityLabels, nextActionLabels, starterPrompts } from '../../config/clinical'
 
 const sessionId = ref(null)
 const msgs = ref([])
@@ -124,7 +125,7 @@ const selectedSlotId = ref(null)
 const selectedSlot = computed(() => slots.value.find(s => s.id === selectedSlotId.value))
 const availabilityLabel = computed(() => {
   if (selectedSlot.value) return `${selectedSlot.value.work_date} ${selectedSlot.value.period === 'AM' ? '上午' : '下午'}`
-  return ({ AVAILABLE: '可预约', NO_SLOTS: '暂无号源', PENDING_REVIEW: '等待人工核对', EMERGENCY: '急诊优先' }[sug.value.availability_status] || sug.value.suggested_date || '日期待确认')
+  return availabilityLabels[sug.value.availability_status] || sug.value.suggested_date || '日期待确认'
 })
 const traceStage = computed(() => {
   if (!suggested.value) return streaming.value ? 1 : 0
@@ -137,7 +138,7 @@ const agentTrace = computed(() => [
   { id: 'resource', label: '匹配资源', detail: traceStage.value >= 3 ? '号源已返回' : needsReview.value ? '等待人工核对' : suggested.value ? '查询号源中' : '等待中', state: traceStage.value >= 3 ? 'done' : traceStage.value === 2 ? 'active' : 'pending' }
 ])
 const confidenceLabel = computed(() => { const value = Number(sug.value.confidence); return Number.isFinite(value) && value > 0 ? `${Math.round(value * 100)}%` : '未提供' })
-const nextActionLabel = computed(() => ({ CONTACT_EMERGENCY: '联系急诊', WAIT_FOR_REVIEW: '等待人工核对', CHOOSE_OTHER_SLOT: '刷新或重新匹配', SELECT_SLOT: '选择就诊时间' }[sug.value.next_action] || (registered.value ? '预约已完成' : '补充就诊信息')))
+const nextActionLabel = computed(() => nextActionLabels[sug.value.next_action] || (registered.value ? '预约已完成' : '补充就诊信息'))
 const showAllSlots = ref(false)
 const displayedSlots = computed(() => showAllSlots.value ? slots.value : slots.value.slice(0, 3))
 const box = ref(null)
