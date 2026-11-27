@@ -35,12 +35,14 @@ public class PatientController {
     private final com.hospital.v2.service.ManualReviewService manualReviews;
     private final SensitiveDataCrypto crypto;
     private final ClinicalOrderService orders;
+    private final com.hospital.v2.service.CareEpisodeService episodes;
 
     public PatientController(PreTriageService preTriage, ReActTriageAgent agent,
                              RegistrationService registration, MedicalRecordService records,
                              com.hospital.v2.dao.Db db, CurrentUserService currentUser,
                              com.hospital.v2.service.ManualReviewService manualReviews,
-                             SensitiveDataCrypto crypto, ClinicalOrderService orders) {
+                             SensitiveDataCrypto crypto, ClinicalOrderService orders,
+                             com.hospital.v2.service.CareEpisodeService episodes) {
         this.preTriage = preTriage;
         this.agent = agent;
         this.registration = registration;
@@ -50,13 +52,32 @@ public class PatientController {
         this.manualReviews = manualReviews;
         this.crypto = crypto;
         this.orders = orders;
+        this.episodes = episodes;
     }
 
     @PostMapping("/session")
     public Result<?> session(@RequestParam(required = false) Long patientId,
                              @AuthenticationPrincipal AuthPrincipal principal) {
         long ownPatientId = currentUser.patientId(principal, patientId);
-        return Result.ok(Map.of("sessionId", preTriage.startSession(ownPatientId)));
+        Map<String, Object> episode = episodes.open(ownPatientId);
+        long sessionId = preTriage.startSession(ownPatientId, ((Number) episode.get("id")).longValue());
+        episodes.attachSession(((Number) episode.get("id")).longValue(), ownPatientId, sessionId);
+        return Result.ok(Map.of("sessionId", sessionId, "episodeId", episode.get("id"),
+                "episodeStatus", episode.get("status"), "nextAction", episode.get("current_action")));
+    }
+
+    /** 当前患者最近一条未完成的门诊任务，供刷新和跨页面恢复使用。 */
+    @GetMapping("/episode/current")
+    public Result<?> currentEpisode(@AuthenticationPrincipal AuthPrincipal principal) {
+        Map<String, Object> episode = episodes.latestForPatient(currentUser.patientId(principal, null));
+        return Result.ok(episode == null ? Map.of("status", "EMPTY") : episode);
+    }
+
+    @GetMapping("/episode/timeline")
+    public Result<?> episodeTimeline(@RequestParam long episodeId,
+                                     @AuthenticationPrincipal AuthPrincipal principal) {
+        long patientId = currentUser.patientId(principal, null);
+        return Result.ok(episodes.currentForPatient(episodeId, patientId));
     }
 
     /** 恢复患者刷新页面前的会话，避免前端看似“失忆”。 */
@@ -65,7 +86,7 @@ public class PatientController {
                                     @AuthenticationPrincipal AuthPrincipal principal) {
         currentUser.assertPatientOwnsSession(principal, sessionId);
         Map<String, Object> session = db.queryOne(
-                "SELECT id, patient_id, status, locked, summary FROM pre_triage_session WHERE id=:id",
+                "SELECT id, patient_id, episode_id, status, locked, summary FROM pre_triage_session WHERE id=:id",
                 Map.of("id", sessionId));
         if (session == null) throw new BizException("预问诊会话不存在或已失效");
         Map<String, Object> out = new LinkedHashMap<>();
@@ -73,6 +94,11 @@ public class PatientController {
         out.put("status", session.get("status"));
         out.put("locked", session.get("locked"));
         out.put("summary", session.get("summary"));
+        out.put("episodeId", session.get("episode_id"));
+        if (session.get("episode_id") instanceof Number episodeId) {
+            out.put("episode", episodes.currentForPatient(episodeId.longValue(),
+                    ((Number) session.get("patient_id")).longValue()));
+        }
         out.put("messages", preTriage.history(sessionId));
 
         // 将最近一次分诊建议和预约结果一并恢复，刷新后仍可继续完成预约。
@@ -106,7 +132,7 @@ public class PatientController {
             suggestion.put("can_register", registration != null || (confirmed && schedule != null));
             suggestion.put("manual_review", pendingReview);
             suggestion.put("queue_code", queueCode(suggestion.get("suggestion_id")));
-            suggestion.put("next_action", pendingReview ? "WAIT_FOR_NURSE"
+            suggestion.put("next_action", pendingReview ? "WAIT_FOR_CLINICAL_REVIEW"
                     : confirmed ? "PATIENT_CAN_BOOK" : "CONTACT_HUMAN");
             out.put("suggestion", suggestion);
             if (registration != null) out.put("registration", registration);
@@ -137,6 +163,7 @@ public class PatientController {
                 if (msg != null && !msg.isBlank()) {
                     preTriage.appendUser(sessionId, msg);
                     manualReviews.reopenAfterPatientReply(sessionId);
+                    episodes.reopenReviewAfterPatientReply(sessionId);
                 }
                 boolean realStreaming = preTriage.streamReply(sessionId, msg == null ? "" : msg,
                         token -> send(em, token),
@@ -188,7 +215,8 @@ public class PatientController {
         r.suggestion().put("review_status", needsReview ? "PENDING" : "CONFIRMED");
         r.suggestion().put("queue_code", queueCode(newSuggestionId));
         r.suggestion().put("manual_review", needsReview);
-        r.suggestion().put("next_action", needsReview ? "WAIT_FOR_NURSE" : "PATIENT_CAN_BOOK");
+        r.suggestion().put("next_action", needsReview ? "WAIT_FOR_CLINICAL_REVIEW" : "PATIENT_CAN_BOOK");
+        episodes.onTriage(sessionId, redFlag, needsReview, String.valueOf(r.suggestion().getOrDefault("reason", "")));
         if (!needsReview || redFlag) {
             preTriage.lock(sessionId, redFlag ? "命中风险规则，已转人工/急诊处理" :
                     "分诊完成，建议科室(id=" + r.suggestion().get("department_id") + ")");
@@ -199,7 +227,10 @@ public class PatientController {
     @GetMapping("/available-slots")
     public Result<?> availableSlots(@RequestParam long suggestionId, @AuthenticationPrincipal AuthPrincipal principal) {
         currentUser.assertPatientOwnsSuggestion(principal, suggestionId);
-        return Result.ok(registration.availableSlots(suggestionId, currentUser.patientId(principal, null)));
+        long patientId = currentUser.patientId(principal, null);
+        List<Map<String, Object>> slots = registration.availableSlots(suggestionId, patientId);
+        episodes.onSlotsLoaded(suggestionId, patientId, !slots.isEmpty());
+        return Result.ok(slots);
     }
 
     @PostMapping("/register")
@@ -207,7 +238,11 @@ public class PatientController {
                               @RequestParam(required = false) Long patientId,
                               @AuthenticationPrincipal AuthPrincipal principal) {
         currentUser.assertPatientOwnsSuggestion(principal, suggestionId);
-        return Result.ok(registration.register(suggestionId, currentUser.patientId(principal, patientId), scheduleId));
+        long ownPatientId = currentUser.patientId(principal, patientId);
+        Map<String, Object> result = registration.register(suggestionId, ownPatientId, scheduleId);
+        Object registrationId = result.get("registration_id");
+        if (registrationId instanceof Number id) episodes.onBooked(suggestionId, ownPatientId, id.longValue());
+        return Result.ok(result);
     }
 
     @GetMapping("/registrations")

@@ -4,7 +4,7 @@
       <div>
         <span class="eyebrow">患者服务 / 就诊准备</span>
         <h2>把这次不舒服，先说给人听。</h2>
-        <p>用几分钟补充症状和健康背景，系统会把信息整理给护士与医生判断。</p>
+        <p>用几分钟补充症状和健康背景，系统会把信息整理给临床团队判断。</p>
       </div>
       <div class="patient-head-note"><span class="care-seal"><i></i></span><div><strong>隐私就诊</strong><small>信息只在本次就诊链路内使用</small></div></div>
     </header>
@@ -52,6 +52,11 @@
       </article>
 
       <aside class="patient-rail">
+        <article v-if="episode" class="episode-task-card">
+          <header><div><span class="eyebrow">本次就医任务</span><h3>{{ episode.status === 'BOOKED' ? '预约已接续' : episode.status === 'NEEDS_REVIEW' ? '等待临床判断' : '正在推进' }}</h3></div><span class="episode-state">{{ episode.current_action || '处理中' }}</span></header>
+          <p>{{ episode.summary || (episode.next_tasks?.[0]?.detail || '智能体会保存当前进度，并在下一步可执行时提醒你。') }}</p>
+          <div v-if="episode.next_tasks?.length" class="episode-next"><span>下一步</span><strong>{{ episode.next_tasks[0].title }}</strong></div>
+        </article>
         <article v-if="suggested" :class="['care-result-card', { urgent: sug.red_flag }]">
           <header><div><span class="eyebrow">就诊建议</span><h3>{{ sug.red_flag ? '请优先人工处理' : sug.status === 'REJECTED' ? '已转人工处理' : needsReview ? '人工核对中' : '建议就诊安排' }}</h3></div><div class="result-signal"><span>当前下一步</span><strong>{{ nextActionLabel }}</strong></div></header>
           <div v-if="sug.red_flag" class="urgent-notice"><i aria-hidden="true">!</i><span>检测到危急征象，请优先联系急诊或人工医生。</span></div>
@@ -60,8 +65,8 @@
           <div class="result-metrics"><span><small>证据置信度</small><b>{{ confidenceLabel }}</b></span><span><small>号源状态</small><b>{{ availabilityLabel }}</b></span><span><small>安全边界</small><b>{{ sug.red_flag ? '需人工介入' : '医护最终判断' }}</b></span></div>
           <div v-if="needsReview" class="booking-handoff">
             <div class="handoff-status"><span class="handoff-dot" aria-hidden="true"></span><div><strong>{{ reviewLabel() }}</strong><small>{{ sug.queue_code || '已建立人工任务' }} · {{ updatedLabel() }}</small></div></div>
-            <p v-if="sug.manual_question"><b>护士想确认：</b>{{ sug.manual_question }}</p>
-            <p v-else>科室仅为初步建议，尚未通过人工核对。资料已提交护士，核对完成后再确认就诊安排。</p>
+            <p v-if="sug.manual_question"><b>临床团队想确认：</b>{{ sug.manual_question }}</p>
+            <p v-else>科室仅为初步建议，尚未通过临床复核。资料已提交接管队列，确认完成后再继续就诊安排。</p>
             <p v-if="!sug.suggested_date">当前尚无可确认号源；人工核对与号源安排是两个独立步骤，核对通过也不代表预约成功。</p>
             <small>状态会自动更新，无需手动刷新。</small>
           </div>
@@ -111,6 +116,7 @@ import { createSseParser } from '../../sse'
 import { availabilityLabels, nextActionLabels, starterPrompts } from '../../config/clinical'
 
 const sessionId = ref(null)
+const episode = ref(null)
 const msgs = ref([])
 const input = ref('')
 const streaming = ref(false)
@@ -153,13 +159,21 @@ let statusTimer
 
 async function loadProfile() { const p = await api.get('/patient/profile'); if (p) Object.assign(profile, { name: p.name || '', gender: p.gender || '男', age: p.age, past_history: p.past_history || '', allergic_history: p.allergic_history || '' }) }
 async function saveProfile() { saving.value = true; try { await api.post('/patient/profile/save', null, profile); ElMessage.success('健康档案已保存') } finally { saving.value = false } }
+async function refreshEpisode() {
+  try {
+    const current = episode.value?.id
+      ? await api.get('/patient/episode/timeline', { episodeId: episode.value.id })
+      : await api.get('/patient/episode/current')
+    if (current?.status !== 'EMPTY') episode.value = current
+  } catch { /* 状态卡片不是主流程，保留当前页面可用 */ }
+}
 async function restoreSession() {
   const previousSession = sessionId.value
   const saved = localStorage.getItem('carenexus_pretriage_session'); if (!saved) return false
   try {
     const data = await api.get('/patient/session/history', { sessionId: Number(saved) })
     if (disposed || sessionId.value !== previousSession) return true
-    sessionId.value = data.sessionId; locked.value = Number(data.locked) === 1 || data.status === 'LOCKED'; msgs.value = (data.messages || []).map(m => ({ role: m.role === 'assistant' ? 'bot' : 'user', text: m.content }))
+    sessionId.value = data.sessionId; episode.value = data.episode || null; locked.value = Number(data.locked) === 1 || data.status === 'LOCKED'; msgs.value = (data.messages || []).map(m => ({ role: m.role === 'assistant' ? 'bot' : 'user', text: m.content }))
     if (data.suggestion) { sug.value = data.suggestion; suggested.value = true; needsReview.value = !!data.suggestion.needs_confirmation; registered.value = Number(data.suggestion.registered) === 1 || !!data.registration; if (data.registration) reg.value = data.registration; lastUpdated.value = new Date(); if (!needsReview.value && !registered.value && data.suggestion.status === 'CONFIRMED') await loadSlots() }
     scroll()
     return true
@@ -175,7 +189,7 @@ onMounted(async () => {
 })
 onUnmounted(() => { disposed = true; chatAbort?.abort(); window.clearInterval(statusTimer) })
 function scroll() { nextTick(() => { if (box.value) box.value.scrollTop = box.value.scrollHeight }) }
-async function startRequest() { const r = await api.post('/patient/session'); sessionId.value = r.sessionId; localStorage.setItem('carenexus_pretriage_session', String(r.sessionId)); msgs.value = []; locked.value = false; suggested.value = false; needsReview.value = false; registered.value = false; sug.value = {}; slots.value = []; selectedSlotId.value = null; showAllSlots.value = false; lastUpdated.value = null }
+async function startRequest() { const r = await api.post('/patient/session'); sessionId.value = r.sessionId; episode.value = { id: r.episodeId, status: r.episodeStatus, current_action: r.nextAction }; localStorage.setItem('carenexus_pretriage_session', String(r.sessionId)); msgs.value = []; locked.value = false; suggested.value = false; needsReview.value = false; registered.value = false; sug.value = {}; slots.value = []; selectedSlotId.value = null; showAllSlots.value = false; lastUpdated.value = null }
 async function start() {
   if (busy.value || streaming.value || refreshing.value || disposed) return
   busy.value = true
@@ -204,8 +218,8 @@ async function send() {
   const userTurns = msgs.value.filter(message => message.role === 'user').length
   if (delivered && !suggested.value && (userTurns >= 3 || /信息已齐全[，,。\s]*正在为您匹配就诊安排/.test(assistant.text))) await doTriage()
 }
-async function doTriageRequest() { const complaint = input.value.trim() || msgs.value.filter(m => m.role === 'user').map(m => m.text).join('，'); if (!complaint) { ElMessage.warning('请先描述症状'); return } try { const result = await api.post('/patient/triage', { sessionId: sessionId.value, complaint }); sug.value = result; suggested.value = true; needsReview.value = !!result.needs_confirmation; locked.value = !needsReview.value || Number(result.red_flag) === 1; lastUpdated.value = new Date(); if (!needsReview.value && result.can_register) await loadSlots() } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '暂时无法生成就诊建议') } }
-async function loadSlots() { if (!sug.value.suggestion_id) return; try { slots.value = await api.get('/patient/available-slots', { suggestionId: sug.value.suggestion_id }); showAllSlots.value = false; if (!slots.value.some(s => s.id === selectedSlotId.value)) selectedSlotId.value = slots.value[0]?.id || null } catch (e) { slots.value = []; selectedSlotId.value = null; ElMessage.error(e.response?.data?.msg || '暂时无法查询号源') } }
+async function doTriageRequest() { const complaint = input.value.trim() || msgs.value.filter(m => m.role === 'user').map(m => m.text).join('，'); if (!complaint) { ElMessage.warning('请先描述症状'); return } try { const result = await api.post('/patient/triage', { sessionId: sessionId.value, complaint }); sug.value = result; suggested.value = true; needsReview.value = !!result.needs_confirmation; locked.value = !needsReview.value || Number(result.red_flag) === 1; lastUpdated.value = new Date(); await refreshEpisode(); if (!needsReview.value && result.can_register) await loadSlots() } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '暂时无法生成就诊建议') } }
+async function loadSlots() { if (!sug.value.suggestion_id) return; try { slots.value = await api.get('/patient/available-slots', { suggestionId: sug.value.suggestion_id }); await refreshEpisode(); showAllSlots.value = false; if (!slots.value.some(s => s.id === selectedSlotId.value)) selectedSlotId.value = slots.value[0]?.id || null } catch (e) { slots.value = []; selectedSlotId.value = null; ElMessage.error(e.response?.data?.msg || '暂时无法查询号源') } }
 async function doTriage() {
   if (busy.value || streaming.value || refreshing.value || disposed) return
   busy.value = true
@@ -218,12 +232,12 @@ async function refreshReview(silent = false) {
   catch (e) { if (!silent) ElMessage.error('暂时无法刷新人工处理状态') }
   finally { refreshing.value = false }
 }
-async function doRegisterRequest() { if (!selectedSlotId.value) return; try { reg.value = await api.post('/patient/register', { suggestionId: sug.value.suggestion_id, scheduleId: selectedSlotId.value }); registered.value = true; ElMessage.success(`预约成功：${reg.value.work_date} ${reg.value.period}`) } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '预约失败，号源可能刚刚被占用'); await loadSlots() } }
+async function doRegisterRequest() { if (!selectedSlotId.value) return; try { reg.value = await api.post('/patient/register', { suggestionId: sug.value.suggestion_id, scheduleId: selectedSlotId.value }); registered.value = true; await refreshEpisode(); ElMessage.success(`预约成功：${reg.value.work_date} ${reg.value.period}`) } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '预约失败，号源可能刚刚被占用'); await loadSlots() } }
 async function doRegister() {
   if (busy.value || streaming.value || refreshing.value || disposed) return
   busy.value = true
   try { await doRegisterRequest() } finally { busy.value = false }
 }
-function reviewLabel() { if (sug.value.red_flag) return '已转急诊 / 人工医生'; if (sug.value.status === 'NEED_MORE_INFO') return '等待你补充信息'; if (sug.value.status === 'REJECTED') return '已转人工处理'; return '已提交护士核对' }
+function reviewLabel() { if (sug.value.red_flag) return '已转急诊 / 人工医生'; if (sug.value.status === 'NEED_MORE_INFO') return '等待你补充信息'; if (sug.value.status === 'REJECTED') return '已转人工处理'; return '已提交临床复核' }
 function updatedLabel() { return lastUpdated.value ? `最近更新 ${lastUpdated.value.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}` : '状态会自动更新' }
 </script>

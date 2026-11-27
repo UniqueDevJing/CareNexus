@@ -5,6 +5,15 @@
       <div class="work-header-actions"><div class="doctor-shift"><span class="status-pip"></span><div><strong>门诊进行中</strong><small>今日排班 · {{ pendingCount }} 位待接诊</small></div></div><button class="secondary-button" @click="load">刷新队列</button></div>
     </header>
 
+    <section v-if="agentTasks.length" class="agent-task-strip surface" aria-label="智能体临床接管任务">
+      <div class="agent-task-strip__heading"><span class="eyebrow">智能体接管</span><strong>{{ agentTasks.length }} 项需要临床判断</strong><small>只展示已通过权限过滤的任务</small></div>
+      <button v-for="task in agentTasks" :key="task.task_id" class="agent-task" type="button" @click="focusTask(task)">
+        <span :class="['agent-task__priority', String(task.priority || '').toLowerCase()]">{{ task.priority === 'URGENT' ? '急' : '审' }}</span>
+        <span><b>{{ task.title }}</b><small>{{ task.patient_name || '患者' }} · {{ task.detail || '请打开对应就诊记录' }}</small></span>
+        <span class="agent-task__arrow" aria-hidden="true">→</span>
+      </button>
+    </section>
+
     <section class="clinical-grid">
       <aside class="patient-queue surface">
         <header class="panel-head"><div><span class="eyebrow">今日队列</span><h3>待接诊患者</h3></div><span class="queue-count">{{ regs.length }}</span></header>
@@ -80,12 +89,29 @@ const recordSections = ['主诉', '现病史', '既往史', '过敏史', '检查
 const emr = reactive({ locked: false, id: null, registrationId: null, chief_complaint: '', present_illness: '', past_history: '', allergy_history: '', assistant_exam: '', diagnosis: '', treatment: '' })
 const exams = ref([])
 const prescriptions = ref([])
+const agentTasks = ref([])
 const orderBusy = ref(false)
 const examForm = reactive({ itemName: '', itemCode: '', fee: '' })
 const rxForm = reactive({ drugName: '', dosage: '', frequency: '', days: '3', quantity: '1', unitPrice: '0' })
 
 onMounted(load)
-async function load() { regs.value = await api.get('/doctor/registrations') }
+async function load() {
+  try {
+    const [registrationRows, taskRows] = await Promise.all([
+      api.get('/doctor/registrations'),
+      api.get('/doctor/agent-tasks')
+    ])
+    regs.value = registrationRows
+    agentTasks.value = taskRows || []
+  } catch (e) {
+    ElMessage.error(e.response?.data?.msg || e.message || '工作台数据加载失败')
+  }
+}
+function focusTask(task) {
+  const row = regs.value.find(item => String(item.patient_id) === String(task.patient_id))
+  if (row) openEmr(row)
+  else ElMessage.info('该接管任务尚未形成预约记录，请先处理临床复核')
+}
 async function openEmr(row) {
   if (busy.value) return
   const sequence = ++detailSequence

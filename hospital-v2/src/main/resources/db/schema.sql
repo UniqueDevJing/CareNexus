@@ -1,6 +1,6 @@
 -- =====================================================================
 --  hospital-v2 数据库 Schema（MySQL 8 / H2-MySQL 兼容）
---  共 23 张表，覆盖接入 / RAG / 工具中心 /
+--  覆盖接入 / RAG / 工具中心 /
 --  多步 ReAct 分诊 / 二次核验落库 / 分诊命中率 / 存储与观测底座
 -- =====================================================================
 
@@ -215,6 +215,7 @@ CREATE TABLE agent_step (
 CREATE TABLE pre_triage_session (
     id          BIGINT       NOT NULL AUTO_INCREMENT,
     patient_id  BIGINT,
+    episode_id  BIGINT,
     status      VARCHAR(16) NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE|LOCKED|DONE',
     locked      TINYINT     NOT NULL DEFAULT 0,
     summary     VARCHAR(512),
@@ -460,4 +461,57 @@ CREATE TABLE operation_audit (
     detail     TEXT,
     create_time DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 27. 一次门诊就医任务：把会话、分诊、预约、接诊和诊后服务串成同一条业务主线
+CREATE TABLE care_episode (
+    id              BIGINT       NOT NULL AUTO_INCREMENT,
+    patient_id      BIGINT       NOT NULL,
+    episode_type    VARCHAR(24)  NOT NULL DEFAULT 'OUTPATIENT',
+    status          VARCHAR(32)  NOT NULL DEFAULT 'INTAKE',
+    current_action  VARCHAR(64),
+    summary         VARCHAR(1000),
+    version         INT          NOT NULL DEFAULT 0,
+    create_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    close_time      DATETIME,
+    PRIMARY KEY (id),
+    KEY idx_episode_patient_status (patient_id, status),
+    KEY idx_episode_update (update_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 28. 就医任务事件：所有状态变化可审计、可回放，不依赖页面猜测状态
+CREATE TABLE care_episode_event (
+    id              BIGINT       NOT NULL AUTO_INCREMENT,
+    episode_id      BIGINT       NOT NULL,
+    event_type      VARCHAR(48)  NOT NULL,
+    from_status     VARCHAR(32),
+    to_status       VARCHAR(32),
+    actor_role      VARCHAR(24)  NOT NULL DEFAULT 'SYSTEM',
+    actor_id        BIGINT,
+    payload_json    TEXT,
+    idempotency_key VARCHAR(128),
+    create_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_episode_event_idempotency (episode_id, idempotency_key),
+    KEY idx_episode_event (episode_id, create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 29. Agent 下一步任务：面向患者或医生的可执行动作，而不是静态提示文案
+CREATE TABLE agent_task (
+    id              BIGINT       NOT NULL AUTO_INCREMENT,
+    episode_id      BIGINT       NOT NULL,
+    task_type       VARCHAR(48)  NOT NULL,
+    status          VARCHAR(24)  NOT NULL DEFAULT 'OPEN',
+    priority        VARCHAR(16)  NOT NULL DEFAULT 'NORMAL',
+    title           VARCHAR(128) NOT NULL,
+    detail          VARCHAR(1000),
+    assigned_role   VARCHAR(24),
+    assigned_id     BIGINT,
+    due_time        DATETIME,
+    create_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    complete_time   DATETIME,
+    PRIMARY KEY (id),
+    KEY idx_agent_task_episode (episode_id, status),
+    KEY idx_agent_task_role (assigned_role, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

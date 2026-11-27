@@ -12,7 +12,7 @@
       <div class="login-story-main" data-enter>
         <span class="login-kicker">一条完整的就诊链路</span>
         <h1 id="login-story-title">先听见患者，<br><em>再开始治疗。</em></h1>
-        <p>把患者的描述、护士的判断、医生的记录放在同一条可追溯的就诊路径里。</p>
+        <p>把患者的描述、临床接管和医生记录放在同一条可追溯的就诊路径里。</p>
       </div>
 
       <div class="clinical-poster" aria-label="CareNexus 就诊链路示意">
@@ -20,7 +20,7 @@
         <div class="poster-line" aria-hidden="true"><i></i><b></b><i></i><b></b><i></i></div>
         <div class="poster-steps">
           <span><b>01</b><strong>患者描述</strong><small>先把不适说清楚</small></span>
-          <span><b>02</b><strong>护士核对</strong><small>需要人判断时接手</small></span>
+          <span><b>02</b><strong>临床复核</strong><small>需要人判断时接手</small></span>
           <span><b>03</b><strong>医生接诊</strong><small>形成结构化病历</small></span>
         </div>
         <div class="poster-footer"><span><i></i> 今日门诊路径已准备</span><small>隐私保护 · 权限隔离 · 全程留痕</small></div>
@@ -39,7 +39,7 @@
 
         <div class="identity-strip" aria-label="服务范围">
           <span><i class="identity-dot identity-dot--patient">患</i><b>患者优先</b></span>
-          <span class="identity-note">医生、护士和运营人员从专用入口处理需要人工判断的事项</span>
+        <span class="identity-note">医生与运营人员从专用入口处理需要人工判断的事项</span>
         </div>
 
         <div class="login-tabs" role="tablist" aria-label="登录或注册">
@@ -60,7 +60,7 @@
           </button>
         </form>
 
-        <div v-if="showDemoAccounts" class="demo-accounts"><span>本地演示账号</span><code>admin</code><code>nurse</code><code>doctor</code><code>patient</code><small>仅开发环境可用</small></div>
+        <div v-if="showDemoAccounts" class="demo-accounts"><span>本地演示账号</span><code>admin</code><code>doctor</code><code>patient</code><small>仅开发环境可用</small></div>
         <p class="login-privacy"><i aria-hidden="true"></i> 医疗信息仅在对应角色权限范围内可见</p>
       </div>
     </section>
@@ -98,7 +98,7 @@ async function submit() {
     const { token: _token, ...safeUser } = user
     localStorage.setItem('hospital_user', JSON.stringify(safeUser))
     ElMessage.success(mode.value === 'login' ? '已进入工作台' : '患者档案已建立')
-    router.replace(user.role === 'admin' ? '/admin/dashboard' : user.role === 'nurse' ? '/nurse/triage' : user.role === 'doctor' ? '/doctor/console' : '/patient/pre')
+    router.replace(user.role === 'admin' ? '/admin/dashboard' : user.role === 'doctor' ? '/doctor/console' : '/patient/pre')
   } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '操作失败，请检查账号信息') }
   finally { loading.value = false }
 }

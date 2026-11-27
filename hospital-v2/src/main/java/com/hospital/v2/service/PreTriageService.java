@@ -30,8 +30,16 @@ public class PreTriageService {
     }
 
     public long startSession(Long patientId) {
-        Map<String, Object> m = Map.of("patient_id", patientId == null ? 0 : patientId);
-        return db.insert("INSERT INTO pre_triage_session (patient_id, status) VALUES (:patient_id,'ACTIVE')", m);
+        return startSession(patientId, null);
+    }
+
+    /** 创建与一次门诊任务绑定的对话；旧调用保留兼容，避免历史接口直接失效。 */
+    public long startSession(Long patientId, Long episodeId) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("patient_id", patientId == null ? 0 : patientId);
+        m.put("episode_id", episodeId);
+        return db.insert("INSERT INTO pre_triage_session (patient_id, episode_id, status) "
+                + "VALUES (:patient_id,:episode_id,'ACTIVE')", m);
     }
 
     public boolean isLocked(long sessionId) {

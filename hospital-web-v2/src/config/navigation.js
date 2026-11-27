@@ -25,19 +25,6 @@ export const navigation = {
     links: [{ path: '/doctor/console', title: '接诊工作台', tag: '01', hint: '查看待处理患者' }],
     sections: [{ title: '临床工作', links: [{ path: '/doctor/console', title: '接诊工作台', tag: '01', hint: '查看待处理患者' }] }]
   },
-  nurse: {
-    label: '人工复核',
-    description: '接住智能体无法安全确认的事项',
-    note: '只处理被安全规则或信息完整性检查拦截的事项。',
-    links: [
-      { path: '/nurse/triage', title: '复核队列', tag: '01', hint: '确认风险与就诊方向' },
-      { path: '/nurse/pharmacy', title: '药房事项', tag: '02', hint: '查看待处理处方' }
-    ],
-    sections: [{ title: '人工处理', links: [
-      { path: '/nurse/triage', title: '复核队列', tag: '01', hint: '确认风险与就诊方向' },
-      { path: '/nurse/pharmacy', title: '药房事项', tag: '02', hint: '查看待处理处方' }
-    ] }]
-  },
   admin: {
     label: '运营与安全',
     description: '只保留运行所需的配置入口',
@@ -83,7 +70,6 @@ export const navigation = {
 
 export const roleMeta = {
   patient: { label: '患者服务', description: '先把今天要解决的事说清楚', avatar: '患', session: '隐私连接已保护' },
-  nurse: { label: '人工复核', description: '接住智能体无法安全确认的事项', avatar: '导', session: '复核队列已保护' },
   doctor: { label: '医生接诊', description: '只处理需要临床判断的事项', avatar: '医', session: '临床会话安全' },
   admin: { label: '运营与安全', description: '只保留运行所需的配置入口', avatar: '运', session: '运行数据已同步' }
 }

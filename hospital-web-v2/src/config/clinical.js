@@ -7,9 +7,13 @@ export const availabilityLabels = {
 
 export const nextActionLabels = {
   CONTACT_EMERGENCY: '联系急诊',
-  WAIT_FOR_REVIEW: '等待人工核对',
+  WAIT_FOR_REVIEW: '等待临床复核',
+  WAIT_FOR_CLINICAL_REVIEW: '等待临床复核',
   CHOOSE_OTHER_SLOT: '刷新或重新匹配',
-  SELECT_SLOT: '选择就诊时间'
+  SELECT_SLOT: '选择就诊时间',
+  PATIENT_CAN_BOOK: '选择可预约时段',
+  WAIT_FOR_PATIENT: '等待你补充信息',
+  CONTACT_HUMAN: '联系门诊服务台'
 }
 
 export const starterPrompts = [

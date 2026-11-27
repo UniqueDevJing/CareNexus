@@ -1,12 +1,9 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-// 普通工作台部署在 /CareNexus/；赛事作品使用根路径静态发布。
-export default defineConfig(({ mode }) => ({
-  base: mode === 'contest' ? '/' : '/CareNexus/',
-  define: {
-    'import.meta.env.VITE_CONTEST_BUILD': JSON.stringify(mode === 'contest' ? 'true' : 'false')
-  },
+// CareNexus 工作台统一部署在 /CareNexus/，避免同一份前端产生两套入口与路由事实。
+export default defineConfig(() => ({
+  base: '/CareNexus/',
   plugins: [vue()],
   server: {
     port: 5192,
@@ -21,7 +18,6 @@ export default defineConfig(({ mode }) => ({
         manualChunks: {
           'vendor-vue': ['vue', 'vue-router'],
           'vendor-http': ['axios'],
-          'vendor-ui': ['element-plus'],
           'vendor-motion': ['gsap']
         }
       }

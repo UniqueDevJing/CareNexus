@@ -17,7 +17,7 @@
       <div class="run-feed">
           <article v-for="item in manualReviews" :key="item.suggestion_id" class="review-row">
             <span class="run-state" :class="item.red_flag ? 'fail' : item.status === 'NEED_MORE_INFO' ? 'wait' : 'ok'"></span>
-            <div><strong>#{{ item.suggestion_id }} · {{ item.patient_name || '患者' }}</strong><small>{{ item.department_name || '待分诊' }} · {{ statusLabel(item.status) }} · {{ item.reason }}</small><small v-if="item.manual_question">护士追问：{{ item.manual_question }}</small></div>
+            <div><strong>#{{ item.suggestion_id }} · {{ item.patient_name || '患者' }}</strong><small>{{ item.department_name || '待分诊' }} · {{ statusLabel(item.status) }} · {{ item.reason }}</small><small v-if="item.manual_question">临床追问：{{ item.manual_question }}</small></div>
             <input v-model="reviewNotes[item.suggestion_id]" class="review-note" :disabled="item.status !== 'PENDING'" :placeholder="item.status === 'PENDING' ? '填写处理依据（必填）' : '等待患者补充后再处理'" @keyup.enter="resolveReview(item, item.red_flag ? 'REJECT' : 'CONFIRM')">
             <div class="review-actions"><template v-if="item.status === 'PENDING'"><button class="text-button" @click="resolveReview(item, 'REJECT')">转人工</button><button v-if="!item.red_flag" class="text-button" @click="resolveReview(item, 'CONFIRM')">确认建议</button></template><span v-else class="panel-note">患者回复后重新入队</span></div>
         </article>
@@ -103,7 +103,7 @@ const reviewNotes = reactive({})
 
 function short(s) { if (!s) return '—'; return s.length > 60 ? s.slice(0, 60) + '…' : s }
 function capacity(d) { return d.slots ? Math.min(Math.round((d.used / d.slots) * 100), 100) : 0 }
-function statusLabel(status) { return status === 'NEED_MORE_INFO' ? '等待患者补充' : status === 'PENDING' ? '待护士核对' : status || '待处理' }
+function statusLabel(status) { return status === 'NEED_MORE_INFO' ? '等待患者补充' : status === 'PENDING' ? '待临床复核' : status || '待处理' }
 async function load() {
   ov.value = await api.get('/admin/dashboard/overview')
   byDept.value = await api.get('/admin/dashboard/by-department')

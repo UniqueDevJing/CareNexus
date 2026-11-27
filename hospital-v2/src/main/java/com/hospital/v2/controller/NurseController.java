@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
-/** 护士端：只处理待人工导诊队列，不暴露管理员配置与观测能力。 */
+/** 旧版临床接管 API：保留给存量客户端，新的前端入口统一使用医生工作台。 */
 @RestController
 @RequestMapping("/api/nurse")
 public class NurseController {
@@ -30,7 +30,7 @@ public class NurseController {
         return Result.ok(reviews.resolve(body, principal));
     }
 
-    /** 护士/药房工作台：只展示已支付且尚未发放的处方。 */
+    /** 存量药房 API：只展示已支付且尚未发放的处方。 */
     @GetMapping("/pharmacy/queue")
     public Result<?> pharmacyQueue() { return Result.ok(orders.pharmacyQueue()); }
 

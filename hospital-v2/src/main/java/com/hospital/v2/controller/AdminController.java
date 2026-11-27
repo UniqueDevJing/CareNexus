@@ -120,7 +120,7 @@ public class AdminController {
     @GetMapping("/dashboard/manual-review")
     public Result<?> manualReview() { return Result.ok(dashboard.manualReview()); }
 
-    /** 人工导诊最小闭环：确认可预约或退回人工处理，生产环境应单独授予导诊/护士角色。 */
+    /** 临床接管兼容入口：确认可预约或退回人工处理，新的产品入口在医生工作台。 */
     @PostMapping("/triage/manual-review")
     public Result<?> resolveManualReview(@RequestBody Map<String, Object> body,
                                          @AuthenticationPrincipal AuthPrincipal principal) {

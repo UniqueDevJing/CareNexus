@@ -3,6 +3,7 @@ package com.hospital.v2.controller;
 import com.hospital.v2.common.Result;
 import com.hospital.v2.service.MedicalRecordService;
 import com.hospital.v2.service.ClinicalOrderService;
+import com.hospital.v2.service.ManualReviewService;
 import com.hospital.v2.security.AuthPrincipal;
 import com.hospital.v2.security.CurrentUserService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -17,11 +18,29 @@ public class DoctorController {
     private final MedicalRecordService records;
     private final CurrentUserService currentUser;
     private final ClinicalOrderService orders;
+    private final com.hospital.v2.service.CareEpisodeService episodes;
+    private final ManualReviewService manualReviews;
 
-    public DoctorController(MedicalRecordService records, CurrentUserService currentUser, ClinicalOrderService orders) {
+    public DoctorController(MedicalRecordService records, CurrentUserService currentUser, ClinicalOrderService orders,
+                            com.hospital.v2.service.CareEpisodeService episodes, ManualReviewService manualReviews) {
         this.records = records;
         this.currentUser = currentUser;
         this.orders = orders;
+        this.episodes = episodes;
+        this.manualReviews = manualReviews;
+    }
+
+    /** Agent 临床接管队列：医生处理高风险、低置信度和信息冲突任务。 */
+    @GetMapping("/agent-tasks")
+    public Result<?> agentTasks(@AuthenticationPrincipal AuthPrincipal principal) {
+        return Result.ok(episodes.doctorTasks(currentUser.doctorId(principal, null)));
+    }
+
+    /** 医生确认智能体接管任务，统一复用临床复核状态与审计逻辑。 */
+    @PostMapping("/agent-tasks/resolve")
+    public Result<?> resolveAgentTask(@RequestBody Map<String, Object> body,
+                                      @AuthenticationPrincipal AuthPrincipal principal) {
+        return Result.ok(manualReviews.resolve(body, principal));
     }
 
     /** 我的接诊列表：挂号 + 患者档案 + 病历状态。 */

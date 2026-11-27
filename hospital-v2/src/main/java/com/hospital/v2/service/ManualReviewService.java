@@ -12,9 +12,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 人工导诊队列：只把异常与不确定情况交给护士，并支持“向患者补问”后重新入队。
+ * 临床接管队列：只把异常与不确定情况交给具备权限的临床人员，并支持
+ * “向患者补问”后重新入队。该服务保留原有接口名称，避免旧客户端升级时断链。
  *
- * PENDING          护士待处理
+ * PENDING          临床待处理
  * NEED_MORE_INFO   已向患者发出关键追问，等待患者补充
  * CONFIRMED        已确认，可继续预约
  * REJECTED         已转急诊/人工医生或结束当前建议
@@ -23,8 +24,12 @@ import java.util.Map;
 @Service
 public class ManualReviewService {
     private final Db db;
+    private final CareEpisodeService episodes;
 
-    public ManualReviewService(Db db) { this.db = db; }
+    public ManualReviewService(Db db, CareEpisodeService episodes) {
+        this.db = db;
+        this.episodes = episodes;
+    }
 
     public List<Map<String, Object>> queue() {
         List<Map<String, Object>> rows = new ArrayList<>(db.query(
@@ -48,7 +53,7 @@ public class ManualReviewService {
         return rows;
     }
 
-    /** 患者回复护士追问后，原建议回到护士待处理队列。 */
+    /** 患者回复临床追问后，原建议回到临床待处理队列。 */
     public void reopenAfterPatientReply(long sessionId) {
         db.update("UPDATE triage_suggestion SET status='PENDING', manual_question=NULL "
                         + "WHERE session_id=:session AND status='NEED_MORE_INFO' AND registered=0",
@@ -64,10 +69,10 @@ public class ManualReviewService {
                 Map.of("id", suggestionId));
         if (suggestion == null) throw new BizException("分诊建议不存在");
         if (!"PENDING".equals(String.valueOf(suggestion.get("status")))) {
-            throw new BizException("该分诊建议当前不在护士待处理状态");
+            throw new BizException("该分诊建议当前不在临床待处理状态");
         }
         String note = text(body.get("note"));
-        if (note.isBlank()) note = "人工导诊处理";
+        if (note.isBlank()) note = "临床接管处理";
         if (note.length() > 220) note = note.substring(0, 220);
         String oldReason = text(suggestion.get("reason"));
         String reason = oldReason.isBlank() ? note : oldReason + "（" + note + "）";
@@ -79,11 +84,11 @@ public class ManualReviewService {
                 throw new BizException("命中风险规则的患者不能直接确认普通预约，请转急诊或人工医生处理");
             }
             long dept = body.get("departmentId") == null
-                    ? ((Number) suggestion.get("department_id")).longValue()
-                    : Long.parseLong(String.valueOf(body.get("departmentId")));
+                    ? numberOrFail(suggestion.get("department_id"), "当前建议缺少科室，无法确认")
+                    : parseId(body.get("departmentId"), "科室编号无效");
             long doctor = body.get("doctorId") == null
-                    ? ((Number) suggestion.get("doctor_id")).longValue()
-                    : Long.parseLong(String.valueOf(body.get("doctorId")));
+                    ? numberOrFail(suggestion.get("doctor_id"), "当前建议缺少医生，无法确认")
+                    : parseId(body.get("doctorId"), "医生编号无效");
             Map<String, Object> doctorRow = db.queryOne(
                     "SELECT id FROM doctor WHERE id=:doctor AND department_id=:dept",
                     Map.of("doctor", doctor, "dept", dept));
@@ -99,11 +104,12 @@ public class ManualReviewService {
             int updated = db.update("UPDATE triage_suggestion SET department_id=:dept, doctor_id=:doctor, status='CONFIRMED', "
                             + "manual_question=NULL, review_note=:reason, reviewer=:reviewer, "
                             + "review_time=CURRENT_TIMESTAMP, reason=:reason WHERE id=:id AND status='PENDING'", update);
-            if (updated == 0) throw new BizException("该分诊建议刚刚被其他护士处理，请刷新队列");
+            if (updated == 0) throw new BizException("该分诊建议刚刚被其他临床人员处理，请刷新队列");
             if (suggestion.get("session_id") != null) {
                 db.update("UPDATE pre_triage_session SET locked=1, status='LOCKED', summary=:summary WHERE id=:id",
-                        Map.of("summary", "人工导诊已确认，可继续预约", "id", suggestion.get("session_id")));
+                        Map.of("summary", "临床复核已确认，可继续预约", "id", suggestion.get("session_id")));
             }
+            episodes.completeClinicalTask(suggestionId);
         } else if ("REQUEST_INFO".equals(action)) {
             if (Integer.valueOf(String.valueOf(suggestion.getOrDefault("red_flag", 0))) == 1) {
                 throw new BizException("命中危急征象时不能等待患者补充，请转急诊或人工医生处理");
@@ -115,10 +121,13 @@ public class ManualReviewService {
             int updated = db.update("UPDATE triage_suggestion SET status='NEED_MORE_INFO', manual_question=:question, "
                             + "review_note=:reason, reviewer=:reviewer, review_time=CURRENT_TIMESTAMP, reason=:reason "
                             + "WHERE id=:id AND status='PENDING'", update);
-            if (updated == 0) throw new BizException("该分诊建议刚刚被其他护士处理，请刷新队列");
+            if (updated == 0) throw new BizException("该分诊建议刚刚被其他临床人员处理，请刷新队列");
             if (suggestion.get("session_id") != null) {
                 db.update("UPDATE pre_triage_session SET summary=:summary WHERE id=:id",
-                        Map.of("summary", "护士需要补充关键信息：" + note, "id", suggestion.get("session_id")));
+                        Map.of("summary", "临床团队需要补充关键信息：" + note, "id", suggestion.get("session_id")));
+            }
+            if (suggestion.get("session_id") instanceof Number sessionId) {
+                episodes.markReviewWaitingForPatient(sessionId.longValue());
             }
         } else if ("REJECT".equals(action)) {
             Map<String, Object> update = new LinkedHashMap<>();
@@ -126,11 +135,12 @@ public class ManualReviewService {
             int updated = db.update("UPDATE triage_suggestion SET status='REJECTED', manual_question=NULL, review_note=:reason, "
                             + "reviewer=:reviewer, review_time=CURRENT_TIMESTAMP, reason=:reason "
                             + "WHERE id=:id AND status='PENDING'", update);
-            if (updated == 0) throw new BizException("该分诊建议刚刚被其他护士处理，请刷新队列");
+            if (updated == 0) throw new BizException("该分诊建议刚刚被其他临床人员处理，请刷新队列");
             if (suggestion.get("session_id") != null) {
                 db.update("UPDATE pre_triage_session SET locked=1, status='LOCKED', summary=:summary WHERE id=:id",
                         Map.of("summary", "当前分诊建议已转人工处理，请联系门诊服务台", "id", suggestion.get("session_id")));
             }
+            episodes.completeClinicalTask(suggestionId);
         } else {
             throw new BizException("只支持 CONFIRM、REQUEST_INFO 或 REJECT");
         }
@@ -155,4 +165,19 @@ public class ManualReviewService {
     }
 
     private String text(Object value) { return value == null ? "" : String.valueOf(value).trim(); }
+
+    private long numberOrFail(Object value, String message) {
+        if (!(value instanceof Number number)) throw new BizException(message);
+        return number.longValue();
+    }
+
+    private long parseId(Object value, String message) {
+        try {
+            long id = Long.parseLong(String.valueOf(value));
+            if (id <= 0) throw new NumberFormatException();
+            return id;
+        } catch (RuntimeException e) {
+            throw new BizException(message);
+        }
+    }
 }

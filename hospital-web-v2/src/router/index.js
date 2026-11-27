@@ -14,14 +14,10 @@ const MyBills = () => import('../views/patient/MyBills.vue')
 const MyExams = () => import('../views/patient/MyExams.vue')
 const MyPrescriptions = () => import('../views/patient/MyPrescriptions.vue')
 const DoctorConsole = () => import('../views/doctor/DoctorConsole.vue')
-const NurseTriage = () => import('../views/nurse/NurseTriage.vue')
-const Pharmacy = () => import('../views/nurse/Pharmacy.vue')
 const Login = () => import('../views/Login.vue')
-const ContestShowcase = () => import('../views/contest/ContestShowcase.vue')
 
 const routes = [
-  { path: '/', redirect: import.meta.env.VITE_CONTEST_BUILD === 'true' ? '/contest' : '/patient/pre' },
-  { path: '/contest', name: 'contest', component: ContestShowcase, meta: { public: true, title: 'CareNexus 医疗安全工作台' } },
+  { path: '/', redirect: '/patient/pre' },
   { path: '/login', name: 'login', component: Login, meta: { public: true, title: '登录' } },
   { path: '/admin/tools', name: 'tools', component: Tools, meta: { group: 'admin', title: '工具注册表', tag: 'MCP' } },
   { path: '/admin/knowledge', name: 'knowledge', component: Knowledge, meta: { group: 'admin', title: '医学知识库', tag: 'RAG' } },
@@ -37,13 +33,12 @@ const routes = [
   { path: '/admin/tools/logs', name: 'toolLogs', component: AdminModule, props: { mode: 'toolLogs' }, meta: { group: 'admin', title: '工具调用日志', tag: 'LOG' } },
   { path: '/admin/agent-runs', name: 'agentRuns', component: AdminModule, props: { mode: 'agentRuns' }, meta: { group: 'admin', title: 'Agent执行时间线', tag: 'TRACE' } },
   { path: '/doctor/console', name: 'doctorConsole', component: DoctorConsole, meta: { group: 'doctor', title: '门诊接诊台', tag: 'EMR' } },
-  { path: '/nurse/triage', name: 'nurseTriage', component: NurseTriage, meta: { group: 'nurse', title: '人工导诊台', tag: 'TRIAGE' } },
   { path: '/patient/pre', name: 'pre', component: PreTriage, meta: { group: 'patient', title: '智能预问诊', tag: 'SSE' } },
   { path: '/patient/records', name: 'records', component: Records, meta: { group: 'patient', title: '我的就诊', tag: 'EMR' } },
   { path: '/patient/bills', name: 'bills', component: MyBills, meta: { group: 'patient', title: '我的账单', tag: 'PAY' } },
   { path: '/patient/exams', name: 'exams', component: MyExams, meta: { group: 'patient', title: '我的检查', tag: 'EXAM' } },
   { path: '/patient/prescriptions', name: 'prescriptions', component: MyPrescriptions, meta: { group: 'patient', title: '我的处方', tag: 'RX' } },
-  { path: '/nurse/pharmacy', name: 'pharmacy', component: Pharmacy, meta: { group: 'nurse', title: '药房配药', tag: 'RX' } }
+  // 临床复核已合并进医生工作台；旧 nurse API 仍保留用于兼容存量客户端。
 ]
 
 const router = createRouter({
@@ -60,7 +55,7 @@ router.beforeEach(to => {
   if (!user) return '/login'
   const group = to.meta.group
   if (group && group !== user.role && user.role !== 'admin') {
-    return user.role === 'doctor' ? '/doctor/console' : user.role === 'nurse' ? '/nurse/triage' : '/patient/pre'
+    return user.role === 'doctor' ? '/doctor/console' : '/patient/pre'
   }
   return true
 })

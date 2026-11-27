@@ -37,6 +37,8 @@ class HospitalV2FlowTest {
     @Autowired
     private DashboardService dashboard;
     @Autowired
+    private CareEpisodeService episodes;
+    @Autowired
     private Db db;
 
     @BeforeEach
@@ -78,6 +80,44 @@ class HospitalV2FlowTest {
         assertNotNull(sug.get("doctor_id"));
         assertNotNull(sug.get("suggested_date"));
         assertEquals(0, ((Number) sug.get("red_flag")).intValue(), "普通症状不应触发危急");
+    }
+
+    @Test
+    void care_episode_links_intake_triage_slots_and_is_idempotent() {
+        Map<String, Object> opened = episodes.open(1L);
+        long episodeId = ((Number) opened.get("id")).longValue();
+        long sessionId = preTriage.startSession(1L, episodeId);
+        episodes.attachSession(episodeId, 1L, sessionId);
+
+        TriageResult result = agent.triage(sessionId, 1L, "咳嗽一周，夜间加重");
+        long suggestionId = ((Number) result.suggestion().get("suggestion_id")).longValue();
+        episodes.onTriage(sessionId, false, false, "症状与科室匹配");
+        assertEquals(CareEpisodeService.TRIAGED, db.queryOne(
+                "SELECT status FROM care_episode WHERE id=:id", Map.of("id", episodeId)).get("status"));
+
+        // 同一回调重复到达时不得重复创建患者任务或事件。
+        episodes.onTriage(sessionId, false, false, "症状与科室匹配");
+        assertEquals(1, ((Number) db.queryOne(
+                "SELECT COUNT(*) total FROM agent_task WHERE episode_id=:id AND task_type='SELECT_SLOT' AND status='OPEN'",
+                Map.of("id", episodeId)).get("total")).intValue());
+
+        episodes.onSlotsLoaded(suggestionId, 1L, true);
+        assertEquals(CareEpisodeService.SLOT_PROPOSED, db.queryOne(
+                "SELECT status FROM care_episode WHERE id=:id", Map.of("id", episodeId)).get("status"));
+        episodes.onSlotsLoaded(suggestionId, 1L, true);
+        assertEquals(1, ((Number) db.queryOne(
+                "SELECT COUNT(*) total FROM agent_task WHERE episode_id=:id AND task_type='SELECT_SLOT' AND status='OPEN'",
+                Map.of("id", episodeId)).get("total")).intValue());
+        assertTrue(episodes.timeline(episodeId, 1L).stream().anyMatch(row ->
+                "TRIAGE_COMPLETED".equals(row.get("event_type"))));
+    }
+
+    @Test
+    void care_episode_rejects_illegal_direct_transition() {
+        Map<String, Object> opened = episodes.open(2L);
+        long episodeId = ((Number) opened.get("id")).longValue();
+        assertThrows(BizException.class, () -> episodes.advance(episodeId, CareEpisodeService.COMPLETED,
+                "TEST_INVALID", "SYSTEM", null, "invalid-transition-" + episodeId, "非法跳转", null));
     }
 
     @Test
