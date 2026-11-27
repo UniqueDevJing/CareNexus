@@ -134,7 +134,15 @@ public class PreTriageService {
     public String memorySummary(long sessionId) {
         Map<String, Object> row = db.queryOne("SELECT memory_summary FROM pre_triage_session WHERE id=:id",
                 Map.of("id", sessionId));
-        return row == null || row.get("memory_summary") == null ? "" : String.valueOf(row.get("memory_summary"));
+        if (row == null) return "";
+        String value = row.get("memory_summary") == null ? "" : String.valueOf(row.get("memory_summary"));
+        if (value.isBlank()) {
+            // 兼容升级前已存在的会话：首次恢复时从原始消息按需重建摘要。
+            refreshMemorySummary(sessionId);
+            row = db.queryOne("SELECT memory_summary FROM pre_triage_session WHERE id=:id", Map.of("id", sessionId));
+            value = row == null || row.get("memory_summary") == null ? "" : String.valueOf(row.get("memory_summary"));
+        }
+        return value;
     }
 
     /**

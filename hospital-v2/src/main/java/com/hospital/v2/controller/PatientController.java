@@ -115,7 +115,7 @@ public class PatientController {
         out.put("status", session.get("status"));
         out.put("locked", session.get("locked"));
         out.put("summary", session.get("summary"));
-        out.put("memorySummary", session.get("memory_summary"));
+        out.put("memorySummary", preTriage.memorySummary(sessionId));
         out.put("episodeId", session.get("episode_id"));
         if (session.get("episode_id") instanceof Number episodeId) {
             out.put("episode", episodes.currentForPatient(episodeId.longValue(),
