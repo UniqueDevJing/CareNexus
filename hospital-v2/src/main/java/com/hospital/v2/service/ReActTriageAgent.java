@@ -30,6 +30,8 @@ import java.util.Map;
  */
 @Service
 public class ReActTriageAgent {
+    private static final java.util.regex.Pattern NEGATION = java.util.regex.Pattern.compile("(没有|无|否认|未见|未有|未出现|不伴)");
+    private static final java.util.regex.Pattern CONTRAST = java.util.regex.Pattern.compile("(但|但是|不过|而是|却)");
 
     /** 动态系统提示词：注入今天日期与步数预算，强约束收敛行为（真实模型防幻觉/防发散的关键）。 */
     private String systemPrompt(int maxSteps) {
@@ -211,13 +213,39 @@ public class ReActTriageAgent {
         for (Map<String, Object> r : rules) {
             String kws = String.valueOf(r.get("keywords"));
             for (String kw : kws.split(",")) {
-                if (!kw.isBlank() && complaint.contains(kw.trim())) {
+                String keyword = kw.trim();
+                if (!keyword.isBlank() && containsPositiveKeyword(complaint, keyword)) {
                     // 命中 → 急诊科（id=5）
                     return 5L;
                 }
             }
         }
         return null;
+    }
+
+    /** 规则命中必须忽略明确否定，避免“没有呼吸困难”被当成危急征象。 */
+    private boolean containsPositiveKeyword(String text, String keyword) {
+        int from = 0;
+        while (from < text.length()) {
+            int hit = text.indexOf(keyword, from);
+            if (hit < 0) return false;
+            int boundary = Math.max(Math.max(text.lastIndexOf('，', hit - 1), text.lastIndexOf(',', hit - 1)),
+                    Math.max(Math.max(text.lastIndexOf('。', hit - 1), text.lastIndexOf('；', hit - 1)),
+                            Math.max(text.lastIndexOf(';', hit - 1), Math.max(text.lastIndexOf('！', hit - 1), text.lastIndexOf('？', hit - 1)))));
+            String prefix = text.substring(boundary + 1, hit);
+            java.util.regex.Matcher negation = NEGATION.matcher(prefix);
+            if (!negation.find() || hasContrastAfter(prefix, negation.start())) return true;
+            from = hit + keyword.length();
+        }
+        return false;
+    }
+
+    private boolean hasContrastAfter(String prefix, int negationStart) {
+        java.util.regex.Matcher contrast = CONTRAST.matcher(prefix);
+        while (contrast.find()) {
+            if (contrast.start() > negationStart) return true;
+        }
+        return false;
     }
 
     private String nearestAvailableDate(long doctorId) {

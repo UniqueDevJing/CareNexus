@@ -143,6 +143,14 @@ class HospitalV2FlowTest {
     }
 
     @Test
+    void negated_red_flag_keywords_do_not_route_to_emergency() {
+        long sid = preTriage.startSession(1L);
+        TriageResult r = agent.triage(sid, 1L, "咳嗽三天，没有发热和呼吸困难，想预约门诊");
+        assertEquals(0, ((Number) r.suggestion().get("red_flag")).intValue());
+        assertNotEquals("EMERGENCY", r.suggestion().get("availability_status"));
+    }
+
+    @Test
     void duplicate_registration_rejected() {
         long sid = preTriage.startSession(2L);
         TriageResult r = agent.triage(sid, 2L, "头痛眩晕");
