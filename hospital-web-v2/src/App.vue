@@ -16,13 +16,15 @@
         <small>{{ user.name || user.username || '当前用户' }}</small>
       </div>
 
-      <div class="nav-section">工作入口</div>
-      <router-link v-for="item in roleConfig.links" :key="item.path" :to="item.path" class="nav-item" :class="{ active: $route.path === item.path }" @click="navOpen = false">
-        <span class="nav-item-index">{{ item.tag }}</span>
-        <span class="nav-item-copy"><b>{{ item.title }}</b><small>{{ item.hint }}</small></span>
-      </router-link>
+      <template v-for="section in roleConfig.sections || [{ title: '工作入口', links: roleConfig.links }]" :key="section.title">
+        <div class="nav-section">{{ section.title }}</div>
+        <router-link v-for="item in section.links" :key="item.path" :to="item.path" class="nav-item" :class="{ active: $route.path === item.path }" @click="navOpen = false">
+          <span class="nav-item-index">{{ item.tag }}</span>
+          <span class="nav-item-copy"><b>{{ item.title }}</b><small>{{ item.hint }}</small></span>
+        </router-link>
+      </template>
 
-      <div v-if="role === 'admin'" class="nav-note"><span class="nav-note-line" aria-hidden="true"></span><p>配置入口已收拢，先从运行状态和人工队列开始。</p></div>
+      <div v-if="roleConfig.note" class="nav-note"><span class="nav-note-line" aria-hidden="true"></span><p>{{ roleConfig.note }}</p></div>
       <div class="sidebar-foot"><span><i aria-hidden="true"></i>安全会话</span><button class="logout-button" @click="logout">退出登录</button></div>
     </aside>
 

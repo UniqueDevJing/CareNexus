@@ -46,8 +46,8 @@
         </div>
 
         <footer class="chat-composer">
-          <textarea v-model="input" rows="2" :disabled="locked || streaming || busy" placeholder="例如：咳嗽三天，想约明天下午的门诊……" @keydown.enter.exact.prevent="send"></textarea>
-          <div class="composer-footer"><span>{{ locked ? '本次咨询已完成' : needsReview ? '人工核对中；需要补充时可继续回复' : streaming || busy ? '正在整理并匹配就诊安排…' : 'Enter 发送 · Shift + Enter 换行' }}</span><div class="composer-actions"><button class="send-button" :disabled="locked || streaming || busy || !input.trim()" @click="send">发送 <span aria-hidden="true">↑</span></button></div></div>
+          <textarea v-model="input" rows="2" :disabled="streaming || busy" :aria-label="locked ? '开始新的预问诊' : '描述你的不适'" :placeholder="locked ? '本次咨询已完成，输入新的问题将开启新的预问诊' : '例如：咳嗽三天，想约明天下午的门诊……'" @keydown.enter.exact.prevent="send"></textarea>
+          <div class="composer-footer"><span>{{ locked ? '本次咨询已完成 · 发送新内容会开启新的预问诊' : needsReview ? '人工核对中；需要补充时可继续回复' : streaming || busy ? '正在整理并匹配就诊安排…' : 'Enter 发送 · Shift + Enter 换行' }}</span><div class="composer-actions"><button class="send-button" :disabled="streaming || busy || !input.trim()" @click="send">{{ locked ? '开始新咨询' : '发送' }} <span aria-hidden="true">↑</span></button></div></div>
         </footer>
       </article>
 
@@ -182,9 +182,9 @@ async function start() {
   try { await startRequest() } finally { busy.value = false }
 }
 async function send() {
-  if (busy.value || refreshing.value || disposed || locked.value) return
+  if (busy.value || refreshing.value || disposed) return
   const text = input.value.trim(); if (!text || streaming.value) return
-  if (!sessionId.value) { busy.value = true; try { await startRequest() } catch (e) { ElMessage.error(e.response?.data?.msg || '暂时无法开始对话'); return } finally { busy.value = false } }
+  if (!sessionId.value || locked.value) { busy.value = true; try { await startRequest() } catch (e) { ElMessage.error(e.response?.data?.msg || '暂时无法开始对话'); return } finally { busy.value = false } }
   msgs.value.push({ role: 'user', text }); input.value = ''; streaming.value = true
   const assistant = { role: 'bot', text: '', typing: true }; msgs.value.push(assistant); scroll()
   let delivered = false

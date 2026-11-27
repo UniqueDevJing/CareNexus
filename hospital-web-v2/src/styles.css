@@ -541,3 +541,111 @@ body { background: var(--paper); color: var(--ink); }
   .patient-page-head h2 { font-size: clamp(32px, 10vw, 42px); }
   .chat-thread { padding-inline: 16px; }
 }
+
+/* Final v3 tokens: declared last so legacy theme rules cannot win the product direction. */
+:root {
+  --paper: #eef2f0;
+  --paper-deep: #e3e9e6;
+  --surface: #ffffff;
+  --surface-muted: #f6f8f7;
+  --ink: #18313a;
+  --ink-soft: #66757a;
+  --forest: #173e45;
+  --forest-2: #1e6b68;
+  --sage: #e3f0ed;
+  --sage-strong: #b7d8d0;
+  --teal: #2a837b;
+  --teal-dark: #1c655f;
+  --rust: #b95e4d;
+  --rust-soft: #fae9e5;
+  --gold: #ad7b3c;
+  --line: #d7e0dc;
+  --line-dark: rgba(224, 239, 235, .18);
+  --display: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --body: "Inter", "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --sidebar: 248px;
+  --shadow: 0 8px 24px rgba(19, 54, 58, .055);
+}
+body { background: var(--paper); color: var(--ink); }
+.app-shell { background: var(--paper); }
+.sidebar { width: var(--sidebar); flex-basis: var(--sidebar); padding: 24px 14px 14px; background: var(--forest); }
+.brand { margin: 0 10px 26px; }
+.brand-copy b { font-family: var(--body); font-size: 17px; letter-spacing: -.025em; }
+.brand-copy small { color: #9cbab8; }
+.nav-context { margin: 0 4px 22px; padding: 13px; border-radius: 10px; background: #204d53; }
+.nav-context strong { color: #f0f7f5; font-size: 13px; }
+.nav-section { margin: 18px 12px 7px; color: #8faead; font-size: 10px; letter-spacing: .06em; }
+.nav-item { min-height: 42px; margin-bottom: 3px; padding: 0 10px; border-radius: 7px; }
+.nav-item:hover { padding-left: 10px; background: #214b51; }
+.nav-item.active { background: #2a6267; border-color: rgba(226, 244, 240, .16); }
+.nav-item.active::before { left: -1px; width: 3px; height: 20px; background: #d5aa66; }
+.nav-item-index { width: 24px; height: 24px; border-radius: 6px; }
+.nav-note { margin: 22px 10px 0; color: #9fb9b5; }
+.main { padding: 0 40px 56px; }
+.main::before { display: none; }
+.topbar { height: 78px; margin: 0 -40px 28px; padding: 0 40px; background: rgba(238, 242, 240, .96); }
+.page-kicker { color: var(--teal-dark); font-size: 10px; letter-spacing: .04em; }
+.page-head h1 { font-family: var(--body); font-size: 22px; font-weight: 600; letter-spacing: -.03em; }
+.topbar-session { gap: 16px; }
+.user-avatar { width: 34px; height: 34px; }
+.workspace { gap: 18px; }
+.surface, .metric-tile, .module-card-grid > *, .module-note-grid > *, .tool-card, .model-card, .document-list, .knowledge-library, .ingest-studio, .retrieval-lab, .symptom-stage, .usage-chart, .reliability-list, .data-table-stage { border-radius: 10px; box-shadow: var(--shadow); }
+.work-header, .patient-page-head, .page-intro { padding: 4px 0 8px; }
+.work-header h2, .patient-page-head h2, .page-intro h2 { font-family: var(--body); font-size: clamp(28px, 3vw, 42px); font-weight: 600; letter-spacing: -.055em; }
+.work-header p, .patient-page-head p, .page-intro p { font-size: 13px; }
+.primary-button, .secondary-button, .send-button { min-height: 40px; border-radius: 6px; }
+.primary-button, .send-button { background: var(--forest-2); border-color: var(--forest-2); }
+.secondary-button { background: var(--surface); }
+.patient-page-head h2::after { width: 44px; height: 3px; margin-top: 15px; background: var(--teal); }
+.care-seal { border-radius: 8px; background: var(--sage); }
+.care-steps { gap: 8px; padding: 11px 14px; border-radius: 10px; background: var(--surface); }
+.care-step { min-width: 148px; }
+.care-step b { width: 28px; height: 28px; border-radius: 6px; }
+.care-step.is-done b, .care-step.is-current b { background: var(--teal-dark); }
+.care-steps > i { width: 28px; background: var(--line); }
+.patient-consult-layout { grid-template-columns: minmax(0, 1fr) 360px; gap: 18px; }
+.consultation-panel { min-height: 660px; border-radius: 14px; box-shadow: 0 12px 30px rgba(19, 54, 58, .07); }
+.chat-header { padding: 16px 20px; }
+.chat-header-actions .chat-channel { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-muted); }
+.agent-trace { padding: 10px 20px; background: var(--surface-muted); }
+.chat-thread { padding: 20px 24px 24px; background: #fbfcfb; }
+.chat-empty { min-height: 340px; }
+.chat-empty-mark { width: 52px; height: 52px; margin-bottom: 16px; border-radius: 10px; }
+.chat-empty h3 { font-family: var(--body); font-size: 23px; font-weight: 600; }
+.starter-prompts button { border-radius: 6px; }
+.message-content p { padding: 11px 14px; border-radius: 6px 12px 12px 12px; }
+.message-row.user .message-content p { background: var(--forest-2); border-color: var(--forest-2); border-radius: 12px 6px 12px 12px; }
+.chat-composer { padding: 14px 18px 16px; }
+.chat-composer textarea { min-height: 64px; border-radius: 6px; background: var(--surface-muted); }
+.chat-composer textarea:disabled { color: var(--ink-soft); opacity: .78; cursor: text; }
+.send-button { min-width: 92px; }
+.patient-rail { gap: 12px; }
+.care-safety-card, .care-result-card, .patient-profile, .patient-rail-note { padding: 18px; border-radius: 10px; }
+.care-safety-card { background: #f4f8f6; }
+.care-result-card { border-top-width: 3px; }
+.result-signal, .slot-option, .result-metrics span { border-radius: 6px; }
+.panel-head { margin-bottom: 16px; }
+.panel-head h3 { font-family: var(--body); font-size: 19px; font-weight: 600; }
+.metric-tile { min-height: 128px; }
+.metric-tile strong { font-family: var(--body); font-weight: 600; }
+.data-summary button, .billing-tabs, .billing-tabs button { border-radius: 6px; }
+
+@media (max-width: 1120px) {
+  .main { padding-inline: 28px; }
+  .topbar { margin-inline: -28px; padding-inline: 28px; }
+  .patient-consult-layout { grid-template-columns: minmax(0, 1fr) 320px; }
+}
+@media (max-width: 820px) {
+  .sidebar { width: min(292px, 84vw); }
+  .main { padding: 0 18px 40px; }
+  .topbar { height: 72px; margin: 0 -18px 24px; padding: 0 18px; }
+  .patient-consult-layout { grid-template-columns: 1fr; }
+  .patient-rail { grid-row: 2; }
+}
+@media (max-width: 600px) {
+  .main { padding-inline: 14px; }
+  .topbar { margin-inline: -14px; padding-inline: 14px; }
+  .patient-page-head h2 { font-size: clamp(30px, 9vw, 38px); }
+  .chat-thread { padding-inline: 16px; }
+  .chat-composer { padding-inline: 14px; }
+}
