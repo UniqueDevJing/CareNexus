@@ -40,6 +40,7 @@ public final class KnowledgeEvidenceMigration implements ApplicationRunner {
         addSegmentColumns();
         resizeSourceType();
         updateDocumentEvidence();
+        backfillLegacyEvidence();
         ensurePediatricGuideline();
         updateSegmentEvidence();
     }
@@ -128,6 +129,82 @@ public final class KnowledgeEvidenceMigration implements ApplicationRunner {
             params.add(doc.title());
             jdbc.update(sql, params.toArray());
         }
+    }
+
+    /**
+     * Existing production volumes contain the expanded 11-base catalog from an older seed.
+     * Backfill provenance by stable title, without replaying data.sql or overwriting a manual
+     * clinician decision. SOURCE_VERIFIED means the source is registered, not clinician-approved.
+     */
+    private void backfillLegacyEvidence() {
+        for (LegacyEvidence doc : legacyEvidence()) {
+            String sql = "UPDATE knowledge_doc SET source_type=?, authority_level=?, "
+                    + "source_organization=COALESCE(NULLIF(source_organization,''),?), "
+                    + "source_url=COALESCE(NULLIF(source_url,''),?), source_version=COALESCE(NULLIF(source_version,''),?), "
+                    + "jurisdiction=COALESCE(NULLIF(jurisdiction,''),?), population=COALESCE(NULLIF(population,''),?), "
+                    + "evidence_grade=COALESCE(NULLIF(evidence_grade,''),?), review_status=CASE "
+                    + "WHEN review_status='PENDING_REVIEW' THEN 'SOURCE_VERIFIED' ELSE review_status END, "
+                    + "review_note=COALESCE(NULLIF(review_note,''),?), license_note=COALESCE(NULLIF(license_note,''),?) "
+                    + "WHERE title=?";
+            jdbc.update(sql, doc.sourceType(), doc.authorityLevel(), doc.organization(), doc.url(), doc.version(),
+                    doc.jurisdiction(), doc.population(), doc.evidenceGrade(),
+                    "来源链接已登记；摘要仍需执业医师审核后用于临床决策。", doc.licenseNote(), doc.title());
+        }
+    }
+
+    /** The legacy catalog is intentionally explicit so future additions require provenance review. */
+    private List<LegacyEvidence> legacyEvidence() {
+        String official = "OFFICIAL_GUIDELINE";
+        String government = "GOVERNMENT_GUIDANCE";
+        String international = "国际循证指南；具体章节和本地流程需人工复核";
+        String china = "中国；特殊人群和本地流程需人工复核";
+        String license = "仅保存来源摘要和链接；完整资料的复制、展示和商业使用须遵守发布方许可。";
+        return List.of(
+                legacy("支气管哮喘防治要点", official, "Global Initiative for Asthma (GINA)", "https://ginasthma.org/2026-gina-strategy-report/", "2026", international, "成人、青少年及儿童；具体适用范围以原指南章节为准", "GINA 循证策略报告", license),
+                legacy("慢性阻塞性肺疾病诊治要点", official, "Global Initiative for Chronic Obstructive Lung Disease (GOLD)", "https://goldcopd.org/2026-gold-report-and-pocket-guide/", "2026", international, "成人 COPD；需结合肺功能和暴露史", "GOLD 循证策略报告", license),
+                legacy("社区获得性肺炎诊治要点", official, "IDSA/ATS", "https://www.idsociety.org/practice-guideline/community-acquired-pneumonia-cap-in-adults/", "2019", international, "成人社区获得性肺炎；儿童和重症流程需使用专门指南", "IDSA/ATS 临床实践指南", license),
+                legacy("肺血栓栓塞症识别与处理", official, "European Society of Cardiology (ESC)", "https://www.escardio.org/guidelines/clinical-practice-guidelines/pocket-guidelines/acute-pulmonary-embolism/", "2019", international, "成人急性肺栓塞；妊娠和特殊人群需专门评估", "ESC/ERS 临床实践指南", license),
+                legacy("高血压基层管理与用药要点", official, "中国高血压防治指南修订委员会等", "https://cjournal.hep.com.cn/1673-7245/CN/1160171857581368285", "2024 修订版", china, "中国成人高血压患者；特殊人群需按专门章节处理", "中国多学会循证临床指南", license),
+                legacy("急性胸痛的鉴别与处置", official, "AHA/ACC Joint Committee on Clinical Practice Guidelines", "https://professional.heart.org/en/guidelines-statements/2021-ahaaccasechestsaemscctscmr-guideline-for-the-evaluation-and-diagnosis-ofcir0000000000001029", "2021", international, "成人急性胸痛；不能替代当地急诊评估", "多学会临床实践指南", license),
+                legacy("心房颤动与卒中预防", official, "AHA/ACC/ACCP/HRS", "https://www.heart.org/-/media/Files/Professional/Quality-Improvement/Get-With-The-Guidelines/Get-With-The-Guidelines-AFIB/AFib-Month/joglaretal20232023accahaaccphrsguidelineforthediagnosisandmanagementofatrialfibrillation.pdf", "2023", international, "成人房颤；抗凝决策必须由医生结合血栓和出血风险判断", "房颤诊断和管理指南", license),
+                legacy("心力衰竭规范治疗", official, "AHA/ACC/HFSA", "https://professional.heart.org/en/guidelines-statements/2022-ahaacchfsa-guideline-for-the-management-of-heart-failure-a-report-of-thecir0000000000001063", "2022", international, "成人心力衰竭；药物和剂量需由医生个体化制定", "心力衰竭管理指南", license),
+                legacy("急性脑卒中的识别与溶栓", government, "中华人民共和国国家卫生健康委员会", "https://www.nhc.gov.cn/wjw/c100175/202108/df1789a9ba174678b1979bc14117b58f.shtml", "2021", china, "疑似卒中须立即进入线下急救流程", "中国脑卒中防治指导规范", license),
+                legacy("头痛的鉴别与处理", official, "International Headache Society", "https://ichd-3.org/", "ICHD-3", international, "头痛分类和诊断标准；危险信号需线下评估", "国际头痛疾病分类", license),
+                legacy("癫痫与发作性疾病", official, "International League Against Epilepsy (ILAE)", "https://www.ilae.org/guidelines/definition-and-classification", "2022", international, "癫痫诊断、分类和用药需由神经科医生确认", "ILAE 分类和临床指南", license),
+                legacy("帕金森病与运动障碍", official, "International Parkinson and Movement Disorder Society", "https://www.movementdisorders.org/MDS/Resources/Clinical-Practice-Guidelines.htm", "现行版", international, "运动障碍诊断和治疗需专科评估", "MDS 临床实践资源", license),
+                legacy("失眠的认知行为治疗", official, "American Academy of Sleep Medicine", "https://aasm.org/resources/clinical-guidelines/", "现行版", international, "成人失眠；合并睡眠呼吸障碍或精神疾病需专科评估", "AASM 临床实践指南", license),
+                legacy("2型糖尿病的诊治路径", official, "American Diabetes Association Professional Practice Committee", "https://diabetesjournals.org/docm-care/collection/18339/2026-Abridged-Standards-of-Care", "Standards of Care 2026", international, "非妊娠成人为主；儿童和妊娠需专门章节", "ADA 年度循证临床标准", license),
+                legacy("糖尿病急性并发症与甲状腺疾病", official, "American Diabetes Association; American Thyroid Association", "https://diabetesjournals.org/docm-care/collection/18339/2026-Abridged-Standards-of-Care", "2026", international, "急性代谢异常和甲状腺疾病需及时线下检查", "ADA/ATA 专业指南索引", license),
+                legacy("骨质疏松与钙磷代谢", official, "International Osteoporosis Foundation", "https://www.osteoporosis.foundation/health-professionals/clinical-guidelines", "现行版", international, "骨折风险、用药和钙磷代谢需结合检查", "IOF 临床指南资源", license),
+                legacy("儿童发热的家庭处理与就医指征", official, "National Institute for Health and Care Excellence (NICE)", "https://www.nice.org.uk/guidance/ng143/chapter/Recommendations", "NG143（2021 修订）", "英国；需结合中国本地流程", "5 岁以下儿童发热初筛与危险信号", "NICE 临床指南", license),
+                legacy("儿童呼吸道感染与雾化治疗", official, "National Institute for Health and Care Excellence (NICE)", "https://www.nice.org.uk/guidance/ng9", "NG9", "英国；儿童用药和雾化适应证需儿科医生复核", "儿童呼吸道感染与雾化治疗", "儿童细支气管炎指南", license),
+                legacy("手足口病与常见传染病", government, "World Health Organization (WHO)", "https://www.who.int/health-topics/hand-foot-and-mouth-disease", "现行版", international, "传染病判断和报告要求以当地疾控流程为准", "WHO 疾病信息", license),
+                legacy("儿童生长、营养与计划免疫", government, "World Health Organization (WHO)", "https://www.who.int/tools/child-growth-standards/standards", "现行版", international, "生长曲线、营养和免疫需结合国家免疫程序", "WHO 儿童生长标准", license),
+                legacy("胃痛、反酸与幽门螺杆菌", official, "American College of Gastroenterology", "https://gi.org/guideline/management-of-helicobacter-pylori-infection/", "2024", international, "幽门螺杆菌检测和根除方案需医生确认", "ACG 临床指南", license),
+                legacy("急性腹痛、腹泻与胆囊疾病", official, "American College of Gastroenterology", "https://gi.org/clinical-guidance/", "现行版", international, "急腹症、脱水和胆道疾病需线下检查", "ACG 临床指南索引", license),
+                legacy("肝脏疾病与脂肪肝管理", official, "American Association for the Study of Liver Diseases", "https://www.aasld.org/practice-guidelines/nafld", "现行版", international, "脂肪肝和肝病分层需结合实验室与影像", "AASLD 实践指南", license),
+                legacy("颈腰痛的评估与保守治疗", official, "National Institute for Health and Care Excellence (NICE)", "https://www.nice.org.uk/guidance/ng59/chapter/Recommendations", "NG59", international, "神经功能缺损、外伤或全身症状需及时就医", "NICE 临床指南", license),
+                legacy("骨折、骨质疏松性骨折与关节置换", official, "American Academy of Orthopaedic Surgeons", "https://www.aaos.org/quality/quality-programs/clinical-practice-guidelines/", "现行版", international, "影像、骨折分型和手术适应证需骨科医生确认", "AAOS 临床实践指南索引", license),
+                legacy("常见运动损伤的急性期处理", official, "American College of Sports Medicine", "https://www.acsm.org/education-resources/trending-topics-resources/resource-library", "现行版", international, "疑似骨折、脱位或神经血管损伤需急诊评估", "ACSM 运动医学资源", license),
+                legacy("月经异常与常见妇科疾病", official, "American College of Obstetricians and Gynecologists", "https://www.acog.org/clinical/clinical-guidance", "现行版", international, "异常出血、妊娠可能和剧烈疼痛需妇科评估", "ACOG 临床指南索引", license),
+                legacy("妊娠期保健与危险信号", official, "American College of Obstetricians and Gynecologists", "https://www.acog.org/giving/programs/quality-and-safety/resources", "现行版", international, "孕期危险信号须按当地产科急救流程处理", "ACOG 妊娠安全资源", license),
+                legacy("尿路结石与前列腺疾病", official, "European Association of Urology", "https://uroweb.org/guidelines", "现行版", international, "结石梗阻、感染、血尿和排尿困难需泌尿科评估", "EAU 指南资源", license),
+                legacy("尿路感染与慢性肾脏病管理", official, "European Association of Urology; KDIGO", "https://kdigo.org/guidelines/ckd-evaluation--and-management/", "KDIGO 2024", international, "尿路感染和慢性肾病需结合尿检、肾功能和影像", "KDIGO/EAU 指南资源", license),
+                legacy("贫血与常见血液病", government, "World Health Organization (WHO)", "https://www.who.int/publications/i/item/9789240088542", "2024", international, "贫血分型和治疗需结合血常规、铁代谢等检查", "WHO 贫血诊断阈值指南", license),
+                legacy("过敏性皮肤病与湿疹管理", official, "American Academy of Dermatology", "https://www.aad.org/member/clinical-quality/guidelines/atopic-dermatitis", "2025 focused update", international, "皮疹诊断和系统用药需皮肤科医生判断", "AAD 特应性皮炎指南", license),
+                legacy("眼科常见急症与慢性病", official, "American Academy of Ophthalmology", "https://www.aao.org/young-ophthalmologists/yo-info/article/essentials-of-top-10-eye-emergencies", "现行版", international, "视力骤降、眼外伤和化学伤须立即眼科急诊", "AAO 眼科急症资源", license),
+                legacy("正确挂号与就诊流程", government, "中华人民共和国国家卫生健康委员会", "https://www.nhc.gov.cn/", "现行版", china, "具体挂号、转诊和急诊流程以就诊机构规则为准", "国家卫生健康委公开信息", license),
+                legacy("检查前后的注意事项", government, "中华人民共和国国家卫生健康委员会", "https://www.nhc.gov.cn/", "现行版", china, "检查准备和禁忌以具体检查单及医疗机构说明为准", "国家卫生健康委公开信息", license),
+                legacy("家庭药箱与安全用药", government, "国家药品监督管理局", "https://www.nmpa.gov.cn/", "现行版", china, "药品说明书、禁忌和相互作用优先于通用建议", "国家药品监督管理局公开信息", license),
+                legacy("疫苗与预防保健", government, "World Health Organization (WHO)", "https://www.who.int/teams/immunization-vaccines-and-biologicals/policies/position-papers", "现行版", international, "接种程序以中国国家免疫规划和接种机构要求为准", "WHO 免疫立场文件", license)
+        );
+    }
+
+    private LegacyEvidence legacy(String title, String authorityLevel, String organization, String url,
+                                  String version, String jurisdiction, String population, String evidenceGrade,
+                                  String licenseNote) {
+        return new LegacyEvidence(title, "GUIDELINE_SUMMARY", authorityLevel, organization, url, version,
+                jurisdiction, population, evidenceGrade, licenseNote);
     }
 
     private void ensurePediatricGuideline() {
@@ -235,6 +312,10 @@ public final class KnowledgeEvidenceMigration implements ApplicationRunner {
     private record DocEvidence(String title, String sourceType, String authorityLevel, String organization, String url,
                                String doi, String version, String publishedAt, String jurisdiction, String population,
                                String evidenceGrade, String licenseNote) {}
+
+    private record LegacyEvidence(String title, String sourceType, String authorityLevel, String organization,
+                                  String url, String version, String jurisdiction, String population,
+                                  String evidenceGrade, String licenseNote) {}
 
     private record SegmentEvidence(String sectionRef, String citationKey, String content) {}
 }

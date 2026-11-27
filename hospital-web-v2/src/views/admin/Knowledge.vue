@@ -7,10 +7,10 @@
         <el-select v-model="baseId" placeholder="选择知识库" style="width:100%" @change="loadDocs">
           <el-option v-for="b in bases" :key="b.id" :label="b.name" :value="b.id" />
         </el-select>
-        <div class="document-list"><article v-for="d in docs" :key="d.id" class="knowledge-doc"><span class="doc-icon">MD</span><div><b>{{ d.title }}</b><small>{{ d.source_organization || '未登记来源' }} · {{ d.source_version || '待核验版本' }}</small><small>#{{ d.id }} · {{ reviewLabel(d.review_status) }}</small></div><i :class="d.review_status === 'SOURCE_VERIFIED' || d.review_status === 'CLINICIAN_APPROVED' ? 'verified' : ''"></i></article><div v-if="!docs.length" class="empty-inline">知识库尚无文档</div></div>
+        <div class="document-list"><article v-for="d in docs" :key="d.id" class="knowledge-doc"><span class="doc-icon">MD</span><div><b>{{ d.title }}</b><small>{{ sourceLabel(d) }} · {{ versionLabel(d) }}</small><small>#{{ d.id }} · {{ reviewLabel(d.review_status) }}</small></div><i :class="d.review_status === 'SOURCE_VERIFIED' || d.review_status === 'CLINICIAN_APPROVED' ? 'verified' : ''"></i></article><div v-if="!docs.length" class="empty-inline">知识库尚无文档</div></div>
       </aside>
       <article class="surface ingest-studio">
-        <header class="panel-head"><div><span class="eyebrow">INGEST</span><h3>内容入库</h3></div><span class="panel-note">未登记来源的上传内容默认待审核</span></header>
+        <header class="panel-head"><div><span class="eyebrow">INGEST</span><h3>内容入库</h3></div><span class="panel-note">新上传内容默认待医生审核，登记来源后才可进入临床检索</span></header>
         <div class="ingest-fields">
           <label>文档标题<el-input v-model="newTitle" placeholder="例如：成人哮喘诊疗指南" /></label>
           <label>结构化内容<el-input v-model="newContent" type="textarea" :rows="8" placeholder="粘贴可信医学资料，系统会自动完成分段和向量化…" /></label>
@@ -47,8 +47,10 @@ const searched = ref(false)
 const pickFile = ref(null)
 const uploading = ref(false)
 
+function sourceLabel(doc) { return doc.source_organization || '来源待登记' }
+function versionLabel(doc) { return doc.source_version || '版本待登记' }
 function reviewLabel(status) {
-  return { SOURCE_VERIFIED: '来源已核验', CLINICIAN_APPROVED: '医生已审核', PENDING_REVIEW: '待审核', RETIRED: '已撤回' }[status] || '未核验'
+  return { SOURCE_VERIFIED: '来源已核验', CLINICIAN_APPROVED: '医生已审核', PENDING_REVIEW: '待医生审核', RETIRED: '已撤回' }[status] || '审核状态待确认'
 }
 
 function onFilePick(file) { pickFile.value = file.raw }
