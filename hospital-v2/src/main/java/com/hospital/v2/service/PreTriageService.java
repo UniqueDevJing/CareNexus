@@ -19,7 +19,8 @@ import java.util.regex.Pattern;
  */
 @Service
 public class PreTriageService {
-    private static final Pattern DURATION = Pattern.compile("(\\d+\\s*(小时|天|周|月|年)|今天|昨天|刚刚|持续|反复|多年)");
+    // 患者常用中文数字描述时长（如“三天”“两周”），不能只识别阿拉伯数字。
+    private static final Pattern DURATION = Pattern.compile("((?:\\d+|[一二两三四五六七八九十百千万几数]+)\\s*(小时|天|周|月|年)|今天|昨天|刚刚|持续|反复|多年)");
     private static final Pattern SAFETY_CONTEXT = Pattern.compile("(没有|无|否|伴随|发热|咳痰|胸闷|胸痛|呼吸|喘|头晕|意识|出血|呕吐|腹泻|过敏|加重|严重)");
     private static final Pattern VISIT_GOAL = Pattern.compile("(预约|挂号|就诊|看病|门诊|医生|建议|咨询|检查)");
     private static final String PRE_SYS = "你是医院预问诊助手，用简短口语化中文追问患者症状，每次只问一个重点，不要罗列。"

@@ -77,7 +77,7 @@ class HospitalV2FlowTest {
         long sid = preTriage.startSession(1L);
         assertFalse(preTriage.assessReadiness(sid, "胸闷").ready());
         preTriage.appendUser(sid, "胸闷");
-        preTriage.appendUser(sid, "持续三天");
+        preTriage.appendUser(sid, "三天");
         assertFalse(preTriage.assessReadiness(sid, null).ready());
         preTriage.appendUser(sid, "没有发热和呼吸困难，想预约门诊");
         assertTrue(preTriage.assessReadiness(sid, null).ready());
