@@ -238,7 +238,8 @@ public class LlmGateway {
                 case 0 -> out = toolCall("symptom_tag_search", "{\"keyword\":\"" + kw + "\"}");
                 case 1 -> out = toolCall("department_query", "{\"keyword\":\"" + kw + "\"}");
                 case 2 -> out = toolCall("doctor_query", "{\"department_id\":" + dept + "}");
-                case 3 -> out = toolCall("schedule_query", "{\"doctor_id\":" + doc + ",\"work_date\":\"2026-11-12\",\"period\":\"AM\"}");
+                case 3 -> out = toolCall("schedule_query", "{\"doctor_id\":" + doc + ",\"work_date\":\""
+                        + java.time.LocalDate.now().plusDays(1) + "\",\"period\":\"AM\"}");
                 default -> out = AiMessage.from("{\"department_id\":" + dept + ",\"doctor_id\":" + doc
                         + ",\"confidence\":0.92,\"reason\":\"根据症状[" + kw + "]结合知识库与工具核查，推荐对应科室与医生。\"}");
             }

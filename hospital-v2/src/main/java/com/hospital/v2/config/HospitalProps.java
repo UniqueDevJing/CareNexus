@@ -9,11 +9,22 @@ import org.springframework.stereotype.Component;
 public class HospitalProps {
     private Llm llm = new Llm();
     private Rag rag = new Rag();
+    private Schedule schedule = new Schedule();
 
     public Llm getLlm() { return llm; }
     public void setLlm(Llm llm) { this.llm = llm; }
     public Rag getRag() { return rag; }
     public void setRag(Rag rag) { this.rag = rag; }
+    public Schedule getSchedule() { return schedule; }
+    public void setSchedule(Schedule schedule) { this.schedule = schedule; }
+
+    public static class Schedule {
+        /** 仅演示环境自动补齐未来号源；真实医院可通过环境变量关闭。 */
+        private boolean seedDemo = false;
+
+        public boolean isSeedDemo() { return seedDemo; }
+        public void setSeedDemo(boolean seedDemo) { this.seedDemo = seedDemo; }
+    }
 
     public static class Llm {
         private String mode = "auto";        // auto | real | mock

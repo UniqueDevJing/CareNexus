@@ -48,3 +48,5 @@ hospital:
   rag:
     top-k: 4
     score-threshold: 0.08
+  schedule:
+    seed-demo: false

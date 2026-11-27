@@ -226,6 +226,10 @@ public class PatientController {
         currentUser.assertPatientOwnsSession(principal, sessionId);
         if (preTriage.isLocked(sessionId)) throw new BizException("本次会话已完成，请开始新的预问诊");
         String completeComplaint = preTriage.triageComplaint(sessionId, complaint);
+        PreTriageService.Readiness readiness = preTriage.assessReadiness(sessionId, completeComplaint);
+        if (!readiness.ready()) {
+            throw new BizException("信息尚不完整，请先补充：" + String.join("、", readiness.missing()));
+        }
         TriageResult r = agent.triage(sessionId, ownPatientId, completeComplaint);
         boolean needsReview = Boolean.TRUE.equals(r.suggestion().get("needs_confirmation"));
         boolean redFlag = Integer.valueOf(String.valueOf(r.suggestion().getOrDefault("red_flag", 0))) == 1;

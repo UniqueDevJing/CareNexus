@@ -248,8 +248,8 @@ async function send() {
   } catch (e) { assistant.text = '连接暂时中断，请检查网络后重试。'; assistant.typing = false; ElMessage.error('导诊助手连接失败，请稍后重试') }
   if (delivered && needsReview.value && sug.value.status === 'NEED_MORE_INFO') { sug.value = { ...sug.value, status: 'PENDING', manual_question: '' } }
   streaming.value = false
-  const userTurns = msgs.value.filter(message => message.role === 'user').length
-  if (delivered && !suggested.value && (userTurns >= 3 || /信息已齐全[，,。\s]*正在为您匹配就诊安排/.test(assistant.text))) await doTriage()
+  // 只有助手明确宣布已收齐事实时才进入分诊；不能再按“第 3 轮”硬触发方案。
+  if (delivered && !suggested.value && /信息已齐全[，,。\s]*正在为您匹配就诊安排/.test(assistant.text)) await doTriage()
 }
 async function doTriageRequest() { const complaint = input.value.trim() || msgs.value.filter(m => m.role === 'user').map(m => m.text).join('，'); if (!complaint) { ElMessage.warning('请先描述症状'); return } try { const result = await api.post('/patient/triage', { sessionId: sessionId.value, complaint }); sug.value = result; suggested.value = true; needsReview.value = !!result.needs_confirmation; locked.value = !needsReview.value || Number(result.red_flag) === 1; lastUpdated.value = new Date(); await refreshEpisode(); if (!needsReview.value && result.can_register) await loadSlots() } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '暂时无法生成就诊建议') } }
 async function loadSlots() { if (!sug.value.suggestion_id) return; try { slots.value = await api.get('/patient/available-slots', { suggestionId: sug.value.suggestion_id }); await refreshEpisode(); showAllSlots.value = false; if (!slots.value.some(s => s.id === selectedSlotId.value)) selectedSlotId.value = slots.value[0]?.id || null } catch (e) { slots.value = []; selectedSlotId.value = null; ElMessage.error(e.response?.data?.msg || '暂时无法查询号源') } }

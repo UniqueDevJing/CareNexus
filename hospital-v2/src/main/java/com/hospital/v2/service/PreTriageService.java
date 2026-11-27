@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.regex.Pattern;
 
 /**
  * 智能预问诊：多轮 SSE 追问（简练、口语化），会话记忆落库；
@@ -17,6 +19,9 @@ import java.util.Map;
  */
 @Service
 public class PreTriageService {
+    private static final Pattern DURATION = Pattern.compile("(\\d+\\s*(小时|天|周|月|年)|今天|昨天|刚刚|持续|反复|多年)");
+    private static final Pattern SAFETY_CONTEXT = Pattern.compile("(没有|无|否|伴随|发热|咳痰|胸闷|胸痛|呼吸|喘|头晕|意识|出血|呕吐|腹泻|过敏|加重|严重)");
+    private static final Pattern VISIT_GOAL = Pattern.compile("(预约|挂号|就诊|看病|门诊|医生|建议|咨询|检查)");
     private static final String PRE_SYS = "你是医院预问诊助手，用简短口语化中文追问患者症状，每次只问一个重点，不要罗列。"
             + "当症状、持续时间和重要伴随症状已经明确，或患者已经回答三轮时，不再重复追问，"
             + "必须以‘信息已齐全，正在为您匹配就诊安排…’结束回复。";
@@ -100,6 +105,12 @@ public class PreTriageService {
                 Map.of("s", sessionId)).get("c")).intValue();
 
         String reply;
+        Readiness readiness = assessReadiness(sessionId, userText);
+        if (!readiness.ready()) {
+            reply = nextQuestion(readiness);
+            appendAssistant(sessionId, reply);
+            return reply;
+        }
         String real = llm.chatText(promptFor(sessionId), conversation(sessionId, userText));
         if (real != null && !real.isBlank()) {
             reply = real;
@@ -109,6 +120,39 @@ public class PreTriageService {
         appendAssistant(sessionId, reply);
         return reply;
     }
+
+    /**
+     * 分诊前的最小事实门槛。模型可以理解语言，但不能绕过必要事实检查直接给出预约方案。
+     * 原始消息仍然完整保留，门槛只负责阻止“问不清就给方案”。
+     */
+    public Readiness assessReadiness(long sessionId, String supplemental) {
+        List<String> statements = history(sessionId).stream()
+                .filter(row -> "user".equalsIgnoreCase(String.valueOf(row.get("role"))))
+                .map(row -> String.valueOf(row.getOrDefault("content", "")))
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        if (supplemental != null && !supplemental.isBlank()
+                && (statements.isEmpty() || !supplemental.equals(statements.get(statements.size() - 1)))) {
+            statements.add(supplemental);
+        }
+        String all = String.join("，", statements);
+        List<String> missing = new ArrayList<>();
+        if (all.isBlank()) missing.add("主要不适");
+        if (!DURATION.matcher(all).find()) missing.add("症状持续时间");
+        if (!SAFETY_CONTEXT.matcher(all).find()) missing.add("是否伴随发热、呼吸困难、胸痛或其他加重表现");
+        if (!VISIT_GOAL.matcher(all).find()) missing.add("本次想解决的就诊目标");
+        return new Readiness(missing.isEmpty(), List.copyOf(missing));
+    }
+
+    private String nextQuestion(Readiness readiness) {
+        if (readiness.missing().contains("主要不适")) return "先告诉我最困扰你的症状，身体哪里不舒服？";
+        if (readiness.missing().contains("症状持续时间")) return "这个症状从什么时候开始？持续了多久，是一直有还是反复出现？";
+        if (readiness.missing().contains("是否伴随发热、呼吸困难、胸痛或其他加重表现")) {
+            return "有没有发热、呼吸困难、胸痛、意识异常等伴随情况？没有也请直接告诉我。";
+        }
+        return "你这次是想预约门诊、咨询就诊方向，还是先了解下一步检查？";
+    }
+
+    public record Readiness(boolean ready, List<String> missing) {}
 
     /** 分诊后锁定会话。 */
     public void lock(long sessionId, String summary) {
@@ -210,7 +254,8 @@ public class PreTriageService {
         StringBuilder prompt = new StringBuilder(PRE_SYS)
                 .append("\n你必须结合本次会话中的历史消息继续追问，不能重复已经回答过的问题。")
                 .append("如果患者表达了预约/挂号意图，先完成必要的症状与安全确认；信息齐全后由系统自动查询真实号源，")
-                .append("不要要求患者点击生成、刷新或重新分诊，也不要声称已经替患者预约。\n");
+                .append("不要要求患者点击生成、刷新或重新分诊，也不要声称已经替患者预约。")
+                .append("在持续时间、伴随/风险表现和就诊目标任一缺失时，绝不能说信息已齐全或给出科室/号源方案，只追问缺失项。\n");
         String memory = session == null || session.get("memory_summary") == null
                 ? "" : String.valueOf(session.get("memory_summary"));
         if (!memory.isBlank()) {

@@ -73,6 +73,17 @@ class HospitalV2FlowTest {
     }
 
     @Test
+    void triage_does_not_start_until_duration_safety_and_visit_goal_are_known() {
+        long sid = preTriage.startSession(1L);
+        assertFalse(preTriage.assessReadiness(sid, "胸闷").ready());
+        preTriage.appendUser(sid, "胸闷");
+        preTriage.appendUser(sid, "持续三天");
+        assertFalse(preTriage.assessReadiness(sid, null).ready());
+        preTriage.appendUser(sid, "没有发热和呼吸困难，想预约门诊");
+        assertTrue(preTriage.assessReadiness(sid, null).ready());
+    }
+
+    @Test
     void normal_triage_returns_valid_department() {
         long sid = preTriage.startSession(1L);
         TriageResult r = agent.triage(sid, 1L, "咳嗽一周，夜间加重");

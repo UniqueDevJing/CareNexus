@@ -27,3 +27,7 @@ hospital:
     api-key: ${LLM_API_KEY}
     chat-model: ${LLM_CHAT_MODEL:qwen-flash}
     embedding-model: ${LLM_EMBEDDING_MODEL:text-embedding-v3}
+  schedule:
+    # 演示服务器若数据库中排班已全部过期，自动按现有医生补齐未来可预约号源。
+    # 接入真实医院排班系统时设置 HOSPITAL_SEED_DEMO_SCHEDULES=false。
+    seed-demo: ${HOSPITAL_SEED_DEMO_SCHEDULES:true}
