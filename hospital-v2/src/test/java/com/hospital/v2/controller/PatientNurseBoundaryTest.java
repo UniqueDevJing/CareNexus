@@ -60,7 +60,29 @@ class PatientNurseBoundaryTest {
     }
 
     @Test
-    void session_endpoint_resumes_server_memory_and_only_force_new_creates_a_session() throws Exception {
+    void registration_rejects_malformed_age_and_multibyte_bcrypt_overflow() throws Exception {
+        String malformedAge = json.createObjectNode()
+                .put("username", "age" + (System.nanoTime() % 100000000))
+                .put("password", "valid-pass-123")
+                .put("name", "审计测试")
+                .put("age", "abc")
+                .toString();
+        mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content(malformedAge))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.msg").value(org.hamcrest.Matchers.containsString("年龄必须")));
+
+        String unicodePassword = json.createObjectNode()
+                .put("username", "unicode" + (System.nanoTime() % 100000000))
+                .put("password", "中".repeat(30))
+                .put("name", "审计测试")
+                .toString();
+        mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content(unicodePassword))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.msg").value(org.hamcrest.Matchers.containsString("UTF-8")));
+    }
+
+    @Test
+    void session_endpoint_resumes_server_memory_and_rejects_duplicate_force_new() throws Exception {
         String patient = login("patient", "123456");
         long first = startSession(patient);
 
@@ -84,10 +106,31 @@ class PatientNurseBoundaryTest {
                         .header("Authorization", "Bearer " + patient)
                         .param("forceNew", "true"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.resumed").value(true))
+                .andReturn().getResponse().getContentAsString();
+        org.junit.jupiter.api.Assertions.assertEquals(first,
+                json.readTree(freshBody).path("data").path("sessionId").asLong());
+    }
+
+    @Test
+    void a_locked_triage_session_is_not_reused_for_the_next_visit() throws Exception {
+        String patient = login("patient", "123456");
+        long first = startSession(patient);
+        mvc.perform(post("/api/patient/triage")
+                        .header("Authorization", "Bearer " + patient)
+                        .param("sessionId", String.valueOf(first))
+                        .param("complaint", "咳嗽一周，没有发热、呼吸困难和胸痛，想预约门诊"))
+                .andExpect(status().isOk());
+
+        String nextBody = mvc.perform(post("/api/patient/session")
+                        .header("Authorization", "Bearer " + patient)
+                        .param("forceNew", "true"))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.resumed").value(false))
                 .andReturn().getResponse().getContentAsString();
-        org.junit.jupiter.api.Assertions.assertNotEquals(first,
-                json.readTree(freshBody).path("data").path("sessionId").asLong());
+        long next = json.readTree(nextBody).path("data").path("sessionId").asLong();
+        org.junit.jupiter.api.Assertions.assertNotEquals(first, next,
+                "完成分诊后应开启新的就诊任务，不能把已锁定会话当作当前会话");
     }
 
     @Test

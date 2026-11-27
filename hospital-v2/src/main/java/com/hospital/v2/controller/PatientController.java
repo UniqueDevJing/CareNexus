@@ -60,17 +60,15 @@ public class PatientController {
                              @RequestParam(defaultValue = "false") boolean forceNew,
                              @AuthenticationPrincipal AuthPrincipal principal) {
         long ownPatientId = currentUser.patientId(principal, patientId);
-        if (!forceNew) {
-            Map<String, Object> existing = preTriage.resumableSession(ownPatientId);
-            if (existing != null) {
-                Map<String, Object> resumed = new LinkedHashMap<>();
-                resumed.put("sessionId", existing.get("session_id"));
-                resumed.put("episodeId", existing.get("episode_id"));
-                resumed.put("episodeStatus", existing.get("episode_status"));
-                resumed.put("sessionStatus", existing.get("session_status"));
-                resumed.put("resumed", true);
-                return Result.ok(resumed);
-            }
+        Map<String, Object> existing = preTriage.resumableSession(ownPatientId);
+        if (existing != null) {
+            Map<String, Object> resumed = new LinkedHashMap<>();
+            resumed.put("sessionId", existing.get("session_id"));
+            resumed.put("episodeId", existing.get("episode_id"));
+            resumed.put("episodeStatus", existing.get("episode_status"));
+            resumed.put("sessionStatus", existing.get("session_status"));
+            resumed.put("resumed", true);
+            return Result.ok(resumed);
         }
         Map<String, Object> episode = episodes.open(ownPatientId);
         long sessionId = preTriage.startSession(ownPatientId, ((Number) episode.get("id")).longValue());

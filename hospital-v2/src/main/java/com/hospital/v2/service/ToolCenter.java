@@ -72,7 +72,11 @@ public class ToolCenter {
     public String execute(String toolCode, String argsJson, Long runId, Long stepId, String source) {
         long t0 = System.currentTimeMillis();
         Map<String, Object> args = JsonUtils.fromJson(argsJson == null ? "{}" : argsJson, new TypeReference<>() {});
-        if (args == null) args = new LinkedHashMap<>();
+        if (args == null) {
+            String error = "{\"error\":\"工具参数不是有效 JSON，已拒绝执行\"}";
+            writeLog(toolCode, argsJson, error, "FAILED", (int) (System.currentTimeMillis() - t0), runId, stepId, source);
+            return error;
+        }
         try {
             String result = switch (toolCode) {
                 case "department_query" -> departmentQuery(str(args, "keyword"));
@@ -130,7 +134,7 @@ public class ToolCenter {
         p.put("date", date);
         p.put("period", normPeriod);
         String sql = "SELECT id, doctor_id, department_id, work_date, period, total_num, remain_num, status "
-                + "FROM doctor_schedule WHERE doctor_id=:doc AND work_date=:date AND status=1";
+                + "FROM doctor_schedule WHERE doctor_id=:doc AND work_date=:date AND status=1 AND remain_num>0";
         if (normPeriod != null && !normPeriod.isBlank()) sql += " AND period=:period";
         List<Map<String, Object>> rows = db.query(sql, p);
         if (!rows.isEmpty()) {

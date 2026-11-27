@@ -275,7 +275,13 @@ class HospitalV2FlowTest {
     void balance_payment_is_atomic_and_refundable() {
         db.update("UPDATE patient_profile SET balance=:balance WHERE id=:id",
                 Map.of("balance", new BigDecimal("100.00"), "id", 1L));
-        long billId = payments.createRegistrationBill(90001L, 1L, new BigDecimal("12.50"));
+        LocalDate date = LocalDate.now().plusDays(80);
+        long scheduleId = db.insert("INSERT INTO doctor_schedule(doctor_id,department_id,work_date,period,total_num,remain_num,status) "
+                + "VALUES(1,1,:date,'AM',1,1,1)", Map.of("date", date));
+        long registrationId = db.insert("INSERT INTO registration(patient_id,department_id,doctor_id,schedule_id,work_date,period,status,payment_status) "
+                + "VALUES(1,1,1,:schedule,:date,'AM','PAID','UNPAID')",
+                Map.of("schedule", scheduleId, "date", date));
+        long billId = payments.createRegistrationBill(registrationId, 1L, new BigDecimal("12.50"));
 
         payments.payBill(billId, 1L, "BALANCE", null);
         assertEquals("PAID", db.queryOne("SELECT status FROM bill WHERE id=:id", Map.of("id", billId)).get("status"));
@@ -287,6 +293,16 @@ class HospitalV2FlowTest {
         assertEquals("REFUNDED", db.queryOne("SELECT status FROM bill WHERE id=:id", Map.of("id", billId)).get("status"));
         assertEquals(new BigDecimal("100.00"), db.queryOne(
                 "SELECT balance FROM patient_profile WHERE id=1", Map.of()).get("balance"));
+        assertEquals("CANCELLED", db.queryOne("SELECT status FROM registration WHERE id=:id", Map.of("id", registrationId)).get("status"));
+        assertEquals(1, ((Number) db.queryOne("SELECT remain_num FROM doctor_schedule WHERE id=:id", Map.of("id", scheduleId)).get("remain_num")).intValue());
+    }
+
+    @Test
+    void unsupported_third_party_payment_is_rejected_before_any_ledger_write() {
+        long billId = payments.createExaminationBill(9001L, 1L, new BigDecimal("8.00"));
+        assertThrows(BizException.class, () -> payments.payBill(billId, 1L, "WECHAT", "client-forged-trade-no"));
+        assertEquals("UNPAID", db.queryOne("SELECT status FROM bill WHERE id=:id", Map.of("id", billId)).get("status"));
+        assertTrue(db.query("SELECT id FROM payment_record WHERE bill_id=:id", Map.of("id", billId)).isEmpty());
     }
 
     @Test

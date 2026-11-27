@@ -1,6 +1,9 @@
 package com.hospital.v2.config;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /**
@@ -8,15 +11,20 @@ import org.springframework.stereotype.Component;
  * 生产 profile 不执行 schema.sql，因此新版本必须具备幂等的启动迁移；所有语句均为 CREATE IF NOT EXISTS。
  */
 @Component
-public final class CareEpisodeSchemaInitializer {
+@Order(3)
+public final class CareEpisodeSchemaInitializer implements ApplicationRunner {
     private final JdbcTemplate jdbc;
 
     public CareEpisodeSchemaInitializer(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
 
-    @jakarta.annotation.PostConstruct
-    public void ensureSchema() {
+    @Override
+    public void run(ApplicationArguments args) {
+        ensureSchema();
+    }
+
+    private void ensureSchema() {
         ensureEpisodeColumn();
         ensureMemoryColumn();
         jdbc.execute("CREATE TABLE IF NOT EXISTS care_episode ("

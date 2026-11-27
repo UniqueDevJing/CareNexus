@@ -18,6 +18,7 @@ import org.springframework.dao.DuplicateKeyException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -68,7 +69,10 @@ public class AuthController {
         String password = text(body.get("password"));
         String name = text(body.get("name"));
         if (!username.matches("[A-Za-z0-9_]{4,32}")) throw new BizException("用户名需为 4-32 位字母、数字或下划线");
-        if (password.length() < 8 || password.length() > 72) throw new BizException("密码长度需为 8-72 位");
+        int passwordBytes = password.getBytes(StandardCharsets.UTF_8).length;
+        if (password.length() < 8 || password.length() > 72 || passwordBytes > 72) {
+            throw new BizException("密码需为 8-72 个字符且 UTF-8 字节数不超过 72");
+        }
         if (name.isBlank() || name.length() > 32) throw new BizException("请填写有效姓名");
         if (db.queryOne("SELECT id FROM user_account WHERE username=:u", Map.of("u", username)) != null) {
             throw new BizException("用户名已存在");
@@ -88,8 +92,8 @@ public class AuthController {
             patient.put("phone", crypto.encrypt(phone));
             patient.put("id_card", crypto.encrypt(idCard));
             patient.put("id_card_hash", crypto.sha256(idCard));
-            int age = number(body.get("age"), 0);
-            if (age < 0 || age > 130) throw new BizException("年龄需为 0-130 的整数");
+            Integer age = optionalInteger(body.get("age"));
+            if (age != null && (age < 0 || age > 130)) throw new BizException("年龄需为 0-130 的整数");
             patient.put("age", age);
             db.insert("INSERT INTO patient_profile(user_id,name,gender,age,phone,id_card,id_card_hash) "
                     + "VALUES(:uid,:name,:gender,:age,:phone,:id_card,:id_card_hash)", patient);
@@ -162,7 +166,9 @@ public class AuthController {
     }
 
     private String text(Object value) { return value == null ? "" : String.valueOf(value).trim(); }
-    private int number(Object value, int fallback) {
-        try { return Integer.parseInt(text(value)); } catch (Exception e) { return fallback; }
+    private Integer optionalInteger(Object value) {
+        if (value == null || text(value).isBlank()) return null;
+        try { return Integer.valueOf(text(value)); }
+        catch (Exception e) { throw new BizException("年龄必须是 0-130 的整数"); }
     }
 }

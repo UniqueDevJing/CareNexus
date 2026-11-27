@@ -44,9 +44,21 @@ public final class TriageWorkflowMigration implements ApplicationRunner {
         addColumnIfMissing("patient_profile", "id_card_hash", "VARCHAR(64)");
         addColumnIfMissing("registration", "payment_status", "VARCHAR(16) NOT NULL DEFAULT 'UNPAID'");
         resizeSensitiveColumns();
+        validateScheduleData();
         createBillingTables();
         createClinicalOrderTables();
         encryptLegacySensitiveData();
+    }
+
+    private void validateScheduleData() throws SQLException {
+        try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery("SELECT COUNT(*) FROM doctor_schedule "
+                     + "WHERE total_num<=0 OR remain_num<0 OR remain_num>total_num")) {
+            rows.next();
+            if (rows.getLong(1) > 0) {
+                throw new SQLException("doctor_schedule contains invalid total_num/remain_num values; repair data before startup");
+            }
+        }
     }
 
     private void resizeSensitiveColumns() throws SQLException {

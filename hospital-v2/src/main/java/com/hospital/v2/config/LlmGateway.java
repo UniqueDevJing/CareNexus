@@ -1,5 +1,6 @@
 package com.hospital.v2.config;
 
+import com.hospital.v2.common.ProviderUnavailableException;
 import com.hospital.v2.dao.Db;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
@@ -77,11 +78,10 @@ public class LlmGateway {
             return Response.from(ai, tu, resp.finishReason(), Map.of());
         } catch (Exception e) {
             logUsage("triage", activeModelName, 0, 0, (int) (System.currentTimeMillis() - t0), false, e.getMessage());
-            // 真实模型不可用（限流 / 网络抖动 / Key 失效）时优雅降级到离线 Mock，保证分诊链路不中断
+            // 临床分诊不能用演示模型伪造结论；调用方必须进入人工接管/重试状态。
             org.slf4j.LoggerFactory.getLogger(LlmGateway.class)
-                    .warn("真实 LLM 调用失败，降级到 Mock：{}", e.getMessage());
-            ChatResponse fr = mock.chat(req);
-            return Response.from(fr.aiMessage(), new TokenUsage(0, 0), fr.finishReason(), Map.of("degraded", "true"));
+                    .warn("真实 LLM 调用失败，转人工处理：{}", e.getMessage());
+            throw new ProviderUnavailableException("模型服务暂不可用，请稍后重试或转人工服务", e);
         }
     }
 

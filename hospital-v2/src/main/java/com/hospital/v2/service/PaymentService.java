@@ -17,7 +17,7 @@ import java.util.Map;
 
 /**
  * 账单与支付结算：只把“已落账”的资金变化标记为成功，余额扣减、流水和业务状态在同一事务内完成。
- * 外部微信/支付宝/银行卡的真实签名回调尚未接入，演示环境要求调用方提供已核验的 tradeNo。
+ * 外部微信/支付宝/银行卡的真实签名回调尚未接入；未接入前必须拒绝第三方支付，不能信任客户端 tradeNo。
  */
 @Service
 public class PaymentService {
@@ -58,9 +58,7 @@ public class PaymentService {
     public void payBill(long billId, long patientId, String channel, String tradeNo) {
         String method = text(channel).toUpperCase(Locale.ROOT);
         if (!CHANNELS.contains(method)) throw new BizException("不支持的支付渠道");
-        if (!"CASH".equals(method) && !"BALANCE".equals(method) && text(tradeNo).isBlank()) {
-            throw new BizException("第三方支付必须提供已核验的支付流水号");
-        }
+        if (!"BALANCE".equals(method)) throw new BizException("当前仅支持账户余额支付，第三方支付尚未接入验签回调");
 
         Map<String, Object> bill = db.queryOne(
                 "SELECT id,patient_id,bill_type,source_id,amount,status FROM bill "
@@ -134,7 +132,21 @@ public class PaymentService {
                 "channel", payment.get("channel"), "reason", text(reason)));
         db.update("UPDATE bill SET status='REFUNDED' WHERE id=:id AND status='PAID'", Map.of("id", billId));
         if ("REGISTRATION".equals(String.valueOf(bill.get("bill_type")))) {
-            db.update("UPDATE registration SET payment_status='REFUNDED' WHERE id=:id", Map.of("id", bill.get("source_id")));
+            Map<String, Object> registration = db.queryOne(
+                    "SELECT id,status,schedule_id FROM registration WHERE id=:id FOR UPDATE",
+                    Map.of("id", bill.get("source_id")));
+            if (registration == null) throw new BizException("关联挂号不存在，无法完成退费");
+            if ("DONE".equals(String.valueOf(registration.get("status")))
+                    || "CANCELLED".equals(String.valueOf(registration.get("status")))) {
+                throw new BizException("该挂号已完成或已取消，不能重复退费");
+            }
+            int affected = db.update("UPDATE registration SET status='CANCELLED', payment_status='REFUNDED' "
+                    + "WHERE id=:id AND status NOT IN ('DONE','CANCELLED')",
+                    Map.of("id", bill.get("source_id")));
+            if (affected == 0) throw new BizException("挂号状态已变化，请刷新后重试");
+            db.update("UPDATE doctor_schedule SET remain_num=remain_num+1 "
+                    + "WHERE id=:schedule AND remain_num<total_num",
+                    Map.of("schedule", registration.get("schedule_id")));
         }
     }
 

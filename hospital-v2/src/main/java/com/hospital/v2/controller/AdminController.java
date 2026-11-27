@@ -221,13 +221,18 @@ public class AdminController {
         body.put("doc", body.get("doctor_id") == null ? null : Long.valueOf(String.valueOf(body.get("doctor_id"))));
         body.put("dept", body.get("department_id") == null ? null : Long.valueOf(String.valueOf(body.get("department_id"))));
         int total = body.get("total_num") == null ? 20 : Integer.parseInt(String.valueOf(body.get("total_num")));
+        if (total <= 0) throw new BizException("总号源数必须大于 0");
         Long id = body.get("id") == null ? null : Long.valueOf(String.valueOf(body.get("id")));
         if (id == null) {
             return Result.ok(Map.of("id", db.insert("INSERT INTO doctor_schedule (doctor_id, department_id, work_date, period, total_num, remain_num, status) "
                     + "VALUES (:doc,:dept,:work_date,:period," + total + "," + total + ",1)", body)));
         }
+        Map<String, Object> existing = db.queryOne("SELECT total_num,remain_num FROM doctor_schedule WHERE id=:id", Map.of("id", id));
+        if (existing == null) throw new BizException("排班不存在");
+        int used = ((Number) existing.get("total_num")).intValue() - ((Number) existing.get("remain_num")).intValue();
+        if (used < 0 || total < used) throw new BizException("总号源数不能少于已使用号源数");
         db.update("UPDATE doctor_schedule SET doctor_id=:doc, department_id=:dept, work_date=:work_date, period=:period, "
-                + "total_num=" + total + " WHERE id=:id", body);
+                + "total_num=" + total + ", remain_num=" + (total - used) + " WHERE id=:id", body);
         return Result.ok();
     }
 

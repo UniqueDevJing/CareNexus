@@ -31,7 +31,7 @@ class AgentBudgetTest {
                 ToolExecutionRequest.builder().id("a").name("department_query").arguments("{}").build(),
                 ToolExecutionRequest.builder().id("b").name("doctor_query").arguments("{}").build()));
         when(gateway.generate(anyList(), anyList())).thenReturn(reply(first, false),
-                reply(AiMessage.from("{\"department_id\":2,\"doctor_id\":3,\"reason\":\"已核查\"}"), false));
+                reply(AiMessage.from("{\"department_id\":2,\"doctor_id\":3,\"confidence\":0.9,\"reason\":\"已核查\"}"), false));
         var result = new ReActTriageAgent(gateway, tools, props, db).triage(sessions.startSession(1L), 1L, "普通不适");
         assertFalse((Boolean) result.suggestion().get("needs_confirmation"));
         verify(gateway, times(2)).generate(argThat(messages -> messages.size() == 6), eq(List.of()));
@@ -43,6 +43,19 @@ class AgentBudgetTest {
         when(tools.buildSpecs()).thenReturn(List.of());
         when(gateway.generate(anyList(), anyList())).thenReturn(reply(AiMessage.from("{broken}"), true));
         var result = new ReActTriageAgent(gateway, tools, props, db).triage(sessions.startSession(1L), 1L, "普通不适");
+        assertTrue((Boolean) result.suggestion().get("needs_confirmation"));
+        assertFalse((Boolean) result.suggestion().get("can_register"));
+    }
+
+    @Test void malformed_final_schema_requires_review_even_without_degraded_metadata() {
+        var gateway = mock(LlmGateway.class); var tools = mock(ToolCenter.class);
+        var props = new HospitalProps(); props.getLlm().setMaxAgentSteps(1);
+        when(gateway.activePromptTemplate(anyString())).thenReturn("分诊");
+        when(tools.buildSpecs()).thenReturn(List.of());
+        when(gateway.generate(anyList(), anyList())).thenReturn(reply(
+                AiMessage.from("{\"department_id\":\"not-an-id\",\"doctor_id\":3,\"confidence\":2}"), false));
+        var result = new ReActTriageAgent(gateway, tools, props, db)
+                .triage(sessions.startSession(1L), 1L, "普通不适");
         assertTrue((Boolean) result.suggestion().get("needs_confirmation"));
         assertFalse((Boolean) result.suggestion().get("can_register"));
     }

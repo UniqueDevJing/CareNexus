@@ -306,10 +306,22 @@ public class ReActTriageAgent {
         int e = text.lastIndexOf("}");
         if (s < 0 || e < 0 || e <= s) return null;
         try {
-            return JsonUtils.fromJson(text.substring(s, e + 1), new com.fasterxml.jackson.core.type.TypeReference<>() {});
+            Map<String, Object> parsed = JsonUtils.fromJson(text.substring(s, e + 1),
+                    new com.fasterxml.jackson.core.type.TypeReference<>() {});
+            if (parsed == null || !positiveInteger(parsed.get("department_id"))
+                    || !positiveInteger(parsed.get("doctor_id"))) return null;
+            Object confidence = parsed.get("confidence");
+            if (!(confidence instanceof Number number)
+                    || number.doubleValue() < 0 || number.doubleValue() > 1) return null;
+            return parsed;
         } catch (RuntimeException invalidModelOutput) {
             return null;
         }
+    }
+
+    private boolean positiveInteger(Object value) {
+        return value instanceof Number number && number.longValue() > 0
+                && number.doubleValue() == number.longValue();
     }
 
     private long newRun(Long sessionId, Long patientId) {

@@ -58,6 +58,8 @@ CREATE TABLE doctor_schedule (
     create_time  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uk_sched (doctor_id, work_date, period),
+    CHECK (total_num > 0),
+    CHECK (remain_num >= 0 AND remain_num <= total_num),
     KEY idx_sched_date (work_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

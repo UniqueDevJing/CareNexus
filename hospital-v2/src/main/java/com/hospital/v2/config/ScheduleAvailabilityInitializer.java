@@ -1,5 +1,8 @@
 package com.hospital.v2.config;
 
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -12,7 +15,8 @@ import java.util.Map;
  * 只在 mysql 演示配置开启，且只为没有任何未来可用排班的医生新增未来号源，不修改历史排班。
  */
 @Component
-public final class ScheduleAvailabilityInitializer {
+@Order(4)
+public final class ScheduleAvailabilityInitializer implements ApplicationRunner {
     private final JdbcTemplate jdbc;
     private final HospitalProps props;
 
@@ -21,8 +25,12 @@ public final class ScheduleAvailabilityInitializer {
         this.props = props;
     }
 
-    @jakarta.annotation.PostConstruct
-    public void ensureFutureDemoSchedules() {
+    @Override
+    public void run(ApplicationArguments args) {
+        ensureFutureDemoSchedules();
+    }
+
+    private void ensureFutureDemoSchedules() {
         if (!props.getSchedule().isSeedDemo()) return;
         List<Map<String, Object>> doctors = jdbc.queryForList("SELECT id, department_id FROM doctor ORDER BY id");
         LocalDate from = LocalDate.now().plusDays(1);

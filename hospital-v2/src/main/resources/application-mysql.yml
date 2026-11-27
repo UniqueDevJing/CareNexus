@@ -2,7 +2,7 @@
 spring:
   datasource:
     # Container deployments use the Compose service name; standalone deployments can override MYSQL_HOST.
-    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:3306/hospital_v2?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:hospital_v2}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: ${MYSQL_USER:root}
     password: ${MYSQL_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -30,4 +30,7 @@ hospital:
   schedule:
     # 演示服务器若数据库中排班已全部过期，自动按现有医生补齐未来可预约号源。
     # 接入真实医院排班系统时设置 HOSPITAL_SEED_DEMO_SCHEDULES=false。
-    seed-demo: ${HOSPITAL_SEED_DEMO_SCHEDULES:true}
+    seed-demo: ${HOSPITAL_SEED_DEMO_SCHEDULES:false}
+  # 空数据库默认拒绝启动，避免把公开演示账号和固定排班带入生产。
+  # 仅在隔离演示环境显式设置 HOSPITAL_SEED_DEMO_DATA=true。
+  seed-demo-data: ${HOSPITAL_SEED_DEMO_DATA:false}

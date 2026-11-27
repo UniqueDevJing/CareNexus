@@ -60,6 +60,7 @@ public class PreTriageService {
                         + "FROM pre_triage_session s "
                         + "LEFT JOIN care_episode e ON e.id=s.episode_id "
                         + "WHERE s.patient_id=:patient "
+                        + "AND s.locked=0 "
                         + "AND (e.id IS NULL OR e.status NOT IN ('COMPLETED','CANCELLED')) "
                         + "ORDER BY s.update_time DESC, s.id DESC LIMIT 1",
                 Map.of("patient", patientId));

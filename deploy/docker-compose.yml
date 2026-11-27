@@ -38,6 +38,9 @@ services:
       LLM_API_KEY: ${LLM_API_KEY}
       LLM_CHAT_MODEL: ${LLM_CHAT_MODEL:-qwen-flash}
       LLM_EMBEDDING_MODEL: ${LLM_EMBEDDING_MODEL:-text-embedding-v3}
+      # Demo data is opt-in. Production remains fail-closed on an empty volume.
+      HOSPITAL_SEED_DEMO_DATA: ${HOSPITAL_SEED_DEMO_DATA:-false}
+      HOSPITAL_SEED_DEMO_SCHEDULES: ${HOSPITAL_SEED_DEMO_SCHEDULES:-false}
     expose:
       - "18092"
 
