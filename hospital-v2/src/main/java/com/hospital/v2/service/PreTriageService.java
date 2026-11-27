@@ -23,6 +23,7 @@ public class PreTriageService {
     private static final Pattern DURATION = Pattern.compile("((?:\\d+|[一二两三四五六七八九十百千万几数]+)\\s*(小时|天|周|月|年)|今天|昨天|刚刚|持续|反复|多年)");
     private static final Pattern SAFETY_CONTEXT = Pattern.compile("(没有|无|否|伴随|发热|咳痰|胸闷|胸痛|呼吸|喘|头晕|意识|出血|呕吐|腹泻|过敏|加重|严重)");
     private static final Pattern VISIT_GOAL = Pattern.compile("(预约|挂号|就诊|看病|门诊|医生|建议|咨询|检查)");
+    private static final String COMPLETION_MARKER = "信息已齐全，正在为您匹配就诊安排…";
     private static final String PRE_SYS = "你是医院预问诊助手，用简短口语化中文追问患者症状，每次只问一个重点，不要罗列。"
             + "当症状、持续时间和重要伴随症状已经明确，或患者已经回答三轮时，不再重复追问，"
             + "必须以‘信息已齐全，正在为您匹配就诊安排…’结束回复。";
@@ -92,19 +93,28 @@ public class PreTriageService {
                                java.util.function.Consumer<String> onComplete,
                                java.util.function.Consumer<Throwable> onError) {
         if (isLocked(sessionId)) return false;
+        // 流式通道也必须经过与普通通道相同的事实门槛。此前这里直接把请求交给
+        // 模型，模型偶尔会在信息不完整时给出科室/预约建议，前端又只能依赖结束标记
+        // 触发分诊，导致“看起来回答了，但业务没有进入下一步”的断链。
+        Readiness readiness = assessReadiness(sessionId, userText);
+        if (!readiness.ready()) {
+            String reply = nextQuestion(readiness);
+            appendAssistant(sessionId, reply);
+            onToken.accept(reply);
+            onComplete.accept(reply);
+            return true;
+        }
         return llm.streamText(promptFor(sessionId), conversation(sessionId, userText), onToken, text -> {
-            appendAssistant(sessionId, text);
-            onComplete.accept(text);
+            String safe = ensureCompletionMarker(text);
+            if (!safe.equals(text)) onToken.accept("\n" + COMPLETION_MARKER);
+            appendAssistant(sessionId, safe);
+            onComplete.accept(safe);
         }, onError);
     }
 
     /** 生成助手追问（真实模型或本地脚本）。 */
     public String generateReply(long sessionId, String userText) {
         if (isLocked(sessionId)) return "本次预问诊已结束并生成分诊建议，如需继续请咨询医生。";
-        int turn = ((Number) db.queryOne(
-                "SELECT COUNT(*) c FROM pre_triage_message WHERE session_id=:s AND role='user'",
-                Map.of("s", sessionId)).get("c")).intValue();
-
         String reply;
         Readiness readiness = assessReadiness(sessionId, userText);
         if (!readiness.ready()) {
@@ -114,9 +124,11 @@ public class PreTriageService {
         }
         String real = llm.chatText(promptFor(sessionId), conversation(sessionId, userText));
         if (real != null && !real.isBlank()) {
-            reply = real;
+            reply = ensureCompletionMarker(real);
         } else {
-            reply = scripted(turn + 1);
+            // 事实门槛已通过时，离线 Mock 也必须推进到完成态；
+            // 不能按轮次继续追问，否则前端永远不会触发真实分诊和号源查询。
+            reply = COMPLETION_MARKER;
         }
         appendAssistant(sessionId, reply);
         return reply;
@@ -161,13 +173,9 @@ public class PreTriageService {
                 Map.of("s", summary == null ? "" : summary, "id", sessionId));
     }
 
-    private String scripted(int t) {
-        return switch (t) {
-            case 1 -> "请问这个症状出现多久了？是持续性的还是一阵一阵的？";
-            case 2 -> "有没有伴随其他不舒服，比如发热、咳痰、胸闷或者头晕？";
-            case 3 -> "以前有没有类似的情况，或者正在长期吃哪些药？";
-            default -> "信息已齐全，正在为您匹配就诊安排…";
-        };
+    private String ensureCompletionMarker(String text) {
+        if (text == null || text.isBlank()) return COMPLETION_MARKER;
+        return text.contains(COMPLETION_MARKER) ? text : text.trim() + "\n" + COMPLETION_MARKER;
     }
 
     public List<Map<String, Object>> history(long sessionId) {

@@ -36,15 +36,40 @@ public class KnowledgeService {
     }
 
     public Map<String, Object> reviewDoc(long docId, String reviewStatus, String note, String reviewer) {
+        return reviewDoc(docId, reviewStatus, note, reviewer, Map.of());
+    }
+
+    /**
+     * 统一处理来源登记和审核状态，避免“页面能点审核、但来源字段仍为空”的假闭环。
+     * 来源字段只接受显式提供的值，空值不会覆盖历史登记。
+     */
+    public Map<String, Object> reviewDoc(long docId, String reviewStatus, String note, String reviewer,
+                                         Map<String, Object> source) {
         Set<String> allowed = Set.of("PENDING_REVIEW", "SOURCE_VERIFIED", "CLINICIAN_APPROVED", "RETIRED");
         if (!allowed.contains(reviewStatus)) throw new BizException("不支持的知识审核状态");
+        source = source == null ? Map.of() : source;
+        Map<String, Object> sourceFields = new LinkedHashMap<>();
+        putIfPresent(sourceFields, "source_organization", source.get("sourceOrganization"));
+        putIfPresent(sourceFields, "source_url", source.get("sourceUrl"));
+        putIfPresent(sourceFields, "source_version", source.get("sourceVersion"));
+        putIfPresent(sourceFields, "source_doi", source.get("sourceDoi"));
+        if (!sourceFields.isEmpty()) {
+            sourceFields.putIfAbsent("source_organization", null);
+            sourceFields.putIfAbsent("source_url", null);
+            sourceFields.putIfAbsent("source_version", null);
+            sourceFields.putIfAbsent("source_doi", null);
+            sourceFields.put("id", docId);
+            db.update("UPDATE knowledge_doc SET source_organization=COALESCE(:source_organization, source_organization), "
+                    + "source_url=COALESCE(:source_url, source_url), source_version=COALESCE(:source_version, source_version), "
+                    + "source_doi=COALESCE(:source_doi, source_doi) WHERE id=:id", sourceFields);
+        }
         Map<String, Object> doc = db.queryOne("SELECT id, source_url, source_organization FROM knowledge_doc WHERE id=:id",
                 Map.of("id", docId));
         if (doc == null) throw new BizException("知识文档不存在");
-        if ("CLINICIAN_APPROVED".equals(reviewStatus)
+        if (("SOURCE_VERIFIED".equals(reviewStatus) || "CLINICIAN_APPROVED".equals(reviewStatus))
                 && (doc.get("source_url") == null || String.valueOf(doc.get("source_url")).isBlank()
                 || doc.get("source_organization") == null || String.valueOf(doc.get("source_organization")).isBlank())) {
-            throw new BizException("医生审核前必须登记权威来源机构和链接");
+            throw new BizException("来源核验前必须登记权威来源机构和链接");
         }
         Map<String, Object> p = new LinkedHashMap<>();
         p.put("id", docId);
@@ -54,6 +79,12 @@ public class KnowledgeService {
         db.update("UPDATE knowledge_doc SET review_status=:status, review_note=:note, reviewed_by=:reviewer, "
                 + "reviewed_at=CURRENT_TIMESTAMP WHERE id=:id", p);
         return db.queryOne("SELECT * FROM knowledge_doc WHERE id=:id", Map.of("id", docId));
+    }
+
+    private void putIfPresent(Map<String, Object> target, String key, Object value) {
+        if (value == null) return;
+        String text = String.valueOf(value).trim();
+        if (!text.isBlank()) target.put(key, text);
     }
 
     /** 新增文档默认进入待审核状态，避免未经来源核验的上传内容直接进入临床检索。 */

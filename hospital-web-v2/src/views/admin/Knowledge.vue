@@ -7,7 +7,7 @@
         <el-select v-model="baseId" placeholder="选择知识库" style="width:100%" @change="loadDocs">
           <el-option v-for="b in bases" :key="b.id" :label="b.name" :value="b.id" />
         </el-select>
-        <div class="document-list"><article v-for="d in docs" :key="d.id" class="knowledge-doc"><span class="doc-icon">MD</span><div><b>{{ d.title }}</b><small>{{ sourceLabel(d) }} · {{ versionLabel(d) }}</small><small>#{{ d.id }} · {{ reviewLabel(d.review_status) }}</small></div><i :class="d.review_status === 'SOURCE_VERIFIED' || d.review_status === 'CLINICIAN_APPROVED' ? 'verified' : ''"></i></article><div v-if="!docs.length" class="empty-inline">知识库尚无文档</div></div>
+        <div class="document-list"><article v-for="d in docs" :key="d.id" class="knowledge-doc" :class="{ selected: selectedDoc?.id === d.id }" tabindex="0" @click="selectDoc(d)" @keydown.enter="selectDoc(d)"><span class="doc-icon">MD</span><div><b>{{ d.title }}</b><small>{{ sourceLabel(d) }} · {{ versionLabel(d) }}</small><small>#{{ d.id }} · {{ reviewLabel(d.review_status) }}</small></div><i :class="d.review_status === 'SOURCE_VERIFIED' || d.review_status === 'CLINICIAN_APPROVED' ? 'verified' : ''"></i></article><div v-if="!docs.length" class="empty-inline">知识库尚无文档</div></div>
       </aside>
       <article class="surface ingest-studio">
         <header class="panel-head"><div><span class="eyebrow">INGEST</span><h3>内容入库</h3></div><span class="panel-note">新上传内容默认待医生审核，登记来源后才可进入临床检索</span></header>
@@ -16,6 +16,12 @@
           <label>结构化内容<el-input v-model="newContent" type="textarea" :rows="8" placeholder="粘贴可信医学资料，系统会自动完成分段和向量化…" /></label>
         </div>
         <div class="ingest-actions"><el-upload :show-file-list="false" accept=".txt,.md" :auto-upload="false" :on-change="onFilePick" :disabled="!baseId"><button class="secondary-button" :disabled="!baseId">选择 TXT / MD 文件</button></el-upload><span v-if="pickFile">{{ pickFile.name }} · {{ (pickFile.size/1024).toFixed(1) }} KB</span><button v-if="pickFile" class="secondary-button" :disabled="uploading" @click="doUpload">{{ uploading ? '处理中…' : '上传并向量化' }}</button><button class="primary-button" @click="addDoc">保存到知识库</button></div>
+        <div v-if="selectedDoc" class="provenance-editor">
+          <div class="provenance-heading"><div><span class="eyebrow">PROVENANCE</span><strong>{{ selectedDoc.title }}</strong></div><span :class="['chip', selectedDoc.review_status === 'PENDING_REVIEW' ? 'warn' : 'ok']">{{ reviewLabel(selectedDoc.review_status) }}</span></div>
+          <div class="provenance-grid"><label>来源机构<el-input v-model="sourceForm.sourceOrganization" placeholder="例如：国家卫生健康委员会" /></label><label>来源链接<el-input v-model="sourceForm.sourceUrl" placeholder="https://…" /></label><label>版本<el-input v-model="sourceForm.sourceVersion" placeholder="例如：2024 修订版" /></label><label>DOI（可选）<el-input v-model="sourceForm.sourceDoi" placeholder="10.…" /></label></div>
+          <label class="provenance-note">审核说明<el-input v-model="sourceForm.note" type="textarea" :rows="2" placeholder="记录核验依据或临床审核备注" /></label>
+          <div class="provenance-actions"><button class="secondary-button" :disabled="reviewing" @click="reviewDoc('SOURCE_VERIFIED')">{{ reviewing ? '保存中…' : '登记来源并核验' }}</button><button class="primary-button" :disabled="reviewing" @click="reviewDoc('CLINICIAN_APPROVED')">提交医生审核</button><button v-if="selectedDoc.review_status !== 'RETIRED'" class="text-button" :disabled="reviewing" @click="reviewDoc('RETIRED')">撤回文档</button></div>
+        </div>
       </article>
     </section>
 
@@ -32,7 +38,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '../../api'
 
@@ -46,6 +52,9 @@ const hits = ref([])
 const searched = ref(false)
 const pickFile = ref(null)
 const uploading = ref(false)
+const selectedDoc = ref(null)
+const reviewing = ref(false)
+const sourceForm = reactive({ sourceOrganization: '', sourceUrl: '', sourceVersion: '', sourceDoi: '', note: '' })
 
 function sourceLabel(doc) { return doc.source_organization || '来源待登记' }
 function versionLabel(doc) { return doc.source_version || '版本待登记' }
@@ -54,6 +63,26 @@ function reviewLabel(status) {
 }
 
 function onFilePick(file) { pickFile.value = file.raw }
+function selectDoc(doc) {
+  selectedDoc.value = doc
+  sourceForm.sourceOrganization = doc.source_organization || ''
+  sourceForm.sourceUrl = doc.source_url || ''
+  sourceForm.sourceVersion = doc.source_version || ''
+  sourceForm.sourceDoi = doc.source_doi || ''
+  sourceForm.note = doc.review_note || ''
+}
+async function reviewDoc(reviewStatus) {
+  if (!selectedDoc.value) return
+  reviewing.value = true
+  try {
+    await api.post('/admin/knowledge/review', null, { docId: selectedDoc.value.id, reviewStatus, ...sourceForm })
+    ElMessage.success(reviewStatus === 'RETIRED' ? '文档已撤回' : '来源与审核状态已更新')
+    await loadDocs()
+    const fresh = docs.value.find(doc => doc.id === selectedDoc.value.id)
+    if (fresh) selectDoc(fresh)
+  } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '审核状态更新失败') }
+  finally { reviewing.value = false }
+}
 async function doUpload() {
   if (!pickFile.value || !baseId.value) return
   uploading.value = true
@@ -72,10 +101,12 @@ async function doUpload() {
 }
 
 async function loadBases() {
-  bases.value = await api.get('/admin/knowledge/bases')
-  if (bases.value.length) { baseId.value = bases.value[0].id; loadDocs() }
+  try {
+    bases.value = await api.get('/admin/knowledge/bases')
+    if (bases.value.length) { baseId.value = bases.value[0].id; await loadDocs() }
+  } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '知识库加载失败') }
 }
-async function loadDocs() { if (baseId.value) docs.value = await api.get('/admin/knowledge/docs', { baseId: baseId.value }) }
+async function loadDocs() { if (baseId.value) { try { docs.value = await api.get('/admin/knowledge/docs', { baseId: baseId.value }) } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '文档加载失败') } } }
 async function addDoc() {
   if (!newTitle.value || !newContent.value) { ElMessage.warning('请填标题与内容'); return }
   await api.post('/admin/knowledge/add', { baseId: baseId.value, title: newTitle.value, content: newContent.value })

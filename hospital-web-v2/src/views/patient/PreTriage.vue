@@ -47,7 +47,7 @@
 
         <footer class="chat-composer">
           <textarea v-model="input" rows="2" :disabled="streaming || busy" :aria-label="locked ? '开始新的预问诊' : '描述你的不适'" :placeholder="locked ? '本次咨询已完成，输入新的问题将开启新的预问诊' : '例如：咳嗽三天，想约明天下午的门诊……'" @keydown.enter.exact.prevent="send"></textarea>
-          <div class="composer-footer"><span>{{ locked ? '本次咨询已完成 · 发送新内容会开启新的预问诊' : needsReview ? '人工核对中；需要补充时可继续回复' : streaming || busy ? '正在整理并匹配就诊安排…' : 'Enter 发送 · Shift + Enter 换行' }}</span><div class="composer-actions"><button class="send-button" :disabled="streaming || busy || !input.trim()" @click="send">{{ locked ? '开始新咨询' : '发送' }} <span aria-hidden="true">↑</span></button></div></div>
+          <div class="composer-footer"><span>{{ locked ? '本次咨询已完成 · 发送新内容会开启新的预问诊' : needsReview ? '人工核对中；需要补充时可继续回复' : streaming || busy ? '正在整理并匹配就诊安排…' : canRequestTriage ? '信息已齐全，可直接进入就诊资源匹配' : 'Enter 发送 · Shift + Enter 换行' }}</span><div class="composer-actions"><button v-if="canRequestTriage" class="secondary-button" :disabled="streaming || busy" @click="doTriage">开始匹配</button><button class="send-button" :disabled="streaming || busy || !input.trim()" @click="send">{{ locked ? '开始新咨询' : '发送' }} <span aria-hidden="true">↑</span></button></div></div>
         </footer>
       </article>
 
@@ -146,6 +146,7 @@ const agentTrace = computed(() => [
 const confidenceLabel = computed(() => { const value = Number(sug.value.confidence); return Number.isFinite(value) && value > 0 ? `${Math.round(value * 100)}%` : '未提供' })
 const nextActionLabel = computed(() => nextActionLabels[sug.value.next_action] || (registered.value ? '预约已完成' : '补充就诊信息'))
 const showAllSlots = ref(false)
+const canRequestTriage = computed(() => Boolean(sessionId.value && !suggested.value && !streaming.value && !busy.value && msgs.value.some(m => m.role === 'bot' && m.text.includes('信息已齐全'))))
 const displayedSlots = computed(() => showAllSlots.value ? slots.value : slots.value.slice(0, 3))
 const box = ref(null)
 const saving = ref(false)

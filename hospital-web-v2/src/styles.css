@@ -161,7 +161,6 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .chat-header { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 20px 24px; border-bottom: 1px solid var(--line); }
 .chat-header + .agent-trace { border-top: 0; }
 .agent-trace { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 11px 24px; border-bottom: 1px solid var(--line); background: #f6f8f2; }.trace-step { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--ink-soft); }.trace-dot { width: 7px; height: 7px; flex: 0 0 auto; border: 1px solid #aabcb1; border-radius: 50%; background: transparent; }.trace-step > div { display: grid; gap: 2px; min-width: 0; }.trace-step b { overflow: hidden; font-size: 10px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }.trace-step small { overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }.trace-step.done { color: var(--teal-dark); }.trace-step.done .trace-dot { border-color: var(--teal); background: var(--teal); box-shadow: 0 0 0 3px rgba(63, 117, 107, .12); }.trace-step.active { color: var(--ink); }.trace-step.active .trace-dot { border-color: var(--teal); background: var(--sage); box-shadow: 0 0 0 3px rgba(63, 117, 107, .13); animation: trace-pulse 1.5s ease-in-out infinite; }
-@keyframes trace-pulse { 50% { box-shadow: 0 0 0 6px rgba(63, 117, 107, .04); } }
 .care-contact { display: flex; align-items: center; gap: 12px; }
 .care-contact strong, .care-contact small { display: block; }
 .care-contact strong { font-size: 14px; font-weight: 600; }
@@ -643,6 +642,35 @@ body { background: var(--paper); color: var(--ink); }
 .metric-tile strong { font-family: var(--body); font-weight: 600; }
 .data-summary button, .billing-tabs, .billing-tabs button { border-radius: 6px; }
 
+/* Product refinement: a clinical desk with an obvious decision path, not a generic AI dashboard. */
+.trace-step.active .trace-dot { animation: none; }
+.composer-actions { display: flex; align-items: center; gap: 8px; }
+.patient-space { position: relative; }
+.patient-space::before { position: absolute; top: 0; right: 0; width: 96px; height: 1px; content: ""; background: var(--gold); opacity: .7; }
+.patient-page-head p { max-width: 590px; }
+.care-steps { position: relative; overflow: hidden; }
+.care-steps::after { position: absolute; right: 14px; bottom: 0; left: 14px; height: 2px; content: ""; background: var(--line); }
+.care-step { position: relative; z-index: 1; }
+.care-step.is-current::after, .care-step.is-done::after { position: absolute; right: 0; bottom: -12px; left: 0; height: 2px; content: ""; background: var(--teal); }
+.chat-header { background: var(--surface); }
+.chat-thread { scrollbar-color: var(--sage-strong) transparent; }
+.message-row { transition: transform .16s ease; }
+.message-row:hover { transform: translateX(2px); }
+.starter-prompts button, .slot-option, .knowledge-doc { transition: border-color .16s ease, background .16s ease, transform .16s ease; }
+.starter-prompts button:hover, .slot-option:hover, .knowledge-doc:hover { transform: translateY(-1px); }
+.knowledge-doc { cursor: pointer; }
+.knowledge-doc.selected { border-color: var(--teal); background: var(--sage); box-shadow: inset 3px 0 var(--teal); }
+.provenance-editor { display: grid; gap: 14px; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+.provenance-heading, .provenance-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.provenance-heading strong { display: block; margin-top: 5px; font-size: 13px; }
+.provenance-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.provenance-grid label, .provenance-note { display: grid; gap: 6px; color: var(--ink-soft); font-size: 11px; }
+.provenance-actions { justify-content: flex-start; flex-wrap: wrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}
+
 @media (max-width: 1120px) {
   .main { padding-inline: 28px; }
   .topbar { margin-inline: -28px; padding-inline: 28px; }
@@ -661,4 +689,8 @@ body { background: var(--paper); color: var(--ink); }
   .patient-page-head h2 { font-size: clamp(30px, 9vw, 38px); }
   .chat-thread { padding-inline: 16px; }
   .chat-composer { padding-inline: 14px; }
+  .composer-footer { align-items: flex-start; gap: 10px; flex-direction: column; }
+  .composer-actions { width: 100%; justify-content: flex-end; }
+  .provenance-grid { grid-template-columns: 1fr; }
+  .provenance-heading { align-items: flex-start; flex-direction: column; }
 }

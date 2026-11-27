@@ -92,7 +92,7 @@ public class AdminController {
         String status = String.valueOf(body.getOrDefault("reviewStatus", "PENDING_REVIEW"));
         String note = String.valueOf(body.getOrDefault("note", ""));
         String reviewer = principal == null ? "admin" : principal.username();
-        return Result.ok(knowledge.reviewDoc(docId, status, note, reviewer));
+        return Result.ok(knowledge.reviewDoc(docId, status, note, reviewer, body));
     }
 
     @GetMapping("/knowledge/retrieve")

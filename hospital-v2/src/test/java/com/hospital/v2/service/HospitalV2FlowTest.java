@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -47,7 +48,7 @@ class HospitalV2FlowTest {
                 "SELECT id FROM doctor_schedule WHERE doctor_id=6 ORDER BY id", Map.of());
         for (int i = 0; i < schedules.size(); i++) {
             db.update("UPDATE doctor_schedule SET work_date=:date WHERE id=:id",
-                    Map.of("date", LocalDate.now().plusDays(7L + i), "id", schedules.get(i).get("id")));
+                    Map.of("date", LocalDate.now().plusDays(20L + i), "id", schedules.get(i).get("id")));
         }
     }
 
@@ -81,6 +82,29 @@ class HospitalV2FlowTest {
         assertFalse(preTriage.assessReadiness(sid, null).ready());
         preTriage.appendUser(sid, "没有发热和呼吸困难，想预约门诊");
         assertTrue(preTriage.assessReadiness(sid, null).ready());
+    }
+
+    @Test
+    void streaming_chat_keeps_incomplete_intake_in_question_state() {
+        long sid = preTriage.startSession(1L);
+        preTriage.appendUser(sid, "胸闷");
+        StringBuilder reply = new StringBuilder();
+        boolean handled = preTriage.streamReply(sid, "胸闷", reply::append,
+                ignored -> { }, error -> fail(error));
+
+        assertTrue(handled, "未完成事实收集时应由确定性门槛直接处理，不调用模型流");
+        assertTrue(reply.toString().contains("从什么时候开始"));
+        assertFalse(reply.toString().contains("信息已齐全"));
+        assertEquals(2, preTriage.history(sid).size(), "追问必须落库，刷新后仍可恢复");
+    }
+
+    @Test
+    void mock_chat_emits_completion_marker_after_readiness_gate() {
+        long sid = preTriage.startSession(1L);
+        String reply = preTriage.generateReply(sid, "胸闷三天，反复出现，没有发热和呼吸困难，想预约门诊");
+
+        assertTrue(reply.contains("信息已齐全，正在为您匹配就诊安排"));
+        assertFalse(reply.contains("以前有没有类似"), "已满足事实门槛时不能继续返回追问");
     }
 
     @Test
@@ -218,10 +242,33 @@ class HospitalV2FlowTest {
 
         List<Map<String, Object>> hits = knowledge.retrieve("哮喘如何评估和管理", 1L, 10);
         assertFalse(hits.isEmpty());
-        assertTrue(hits.stream().allMatch(hit -> "SOURCE_VERIFIED".equals(hit.get("review_status"))
+        assertTrue(hits.stream().allMatch(hit -> Set.of("SOURCE_VERIFIED", "CLINICIAN_APPROVED")
+                .contains(hit.get("review_status"))
                 && String.valueOf(hit.get("source_url")).startsWith("https://")
                 && hit.get("source_notice") != null));
         assertTrue(hits.stream().noneMatch(hit -> uploadId == ((Number) hit.get("doc_id")).longValue()));
+    }
+
+    @Test
+    void knowledge_review_persists_provenance_and_rejects_unverified_promotion() {
+        long uploadId = knowledge.addDoc(1L, "来源闭环测试资料", "用于验证来源登记与审核状态流转");
+
+        assertThrows(BizException.class, () -> knowledge.reviewDoc(
+                uploadId, "SOURCE_VERIFIED", "缺少来源", "admin", Map.of()));
+
+        Map<String, Object> verified = knowledge.reviewDoc(uploadId, "SOURCE_VERIFIED", "管理员核验", "admin",
+                Map.of("sourceOrganization", "国家卫生健康委",
+                        "sourceUrl", "https://www.nhc.gov.cn/example-guideline",
+                        "sourceVersion", "2025版"));
+        assertEquals("SOURCE_VERIFIED", verified.get("review_status"));
+        assertEquals("国家卫生健康委", verified.get("source_organization"));
+        assertEquals("https://www.nhc.gov.cn/example-guideline", verified.get("source_url"));
+        assertEquals("2025版", verified.get("source_version"));
+
+        Map<String, Object> approved = knowledge.reviewDoc(uploadId, "CLINICIAN_APPROVED", "医生复核通过", "doctor",
+                Map.of());
+        assertEquals("CLINICIAN_APPROVED", approved.get("review_status"));
+        assertEquals("国家卫生健康委", approved.get("source_organization"));
     }
 
     @Test

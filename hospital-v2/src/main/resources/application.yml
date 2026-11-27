@@ -49,4 +49,6 @@ hospital:
     top-k: 4
     score-threshold: 0.08
   schedule:
-    seed-demo: false
+    # 本地 H2 演示默认补齐未来号源，避免固定种子日期过期后预约链路失去可验证入口。
+    # 生产 MySQL 使用 application-mysql.yml 中的 HOSPITAL_SEED_DEMO_SCHEDULES 覆盖。
+    seed-demo: true
