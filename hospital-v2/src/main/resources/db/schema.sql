@@ -219,6 +219,7 @@ CREATE TABLE pre_triage_session (
     status      VARCHAR(16) NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE|LOCKED|DONE',
     locked      TINYINT     NOT NULL DEFAULT 0,
     summary     VARCHAR(512),
+    memory_summary VARCHAR(1000),
     create_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id)

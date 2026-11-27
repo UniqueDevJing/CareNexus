@@ -18,6 +18,7 @@ public final class CareEpisodeSchemaInitializer {
     @jakarta.annotation.PostConstruct
     public void ensureSchema() {
         ensureEpisodeColumn();
+        ensureMemoryColumn();
         jdbc.execute("CREATE TABLE IF NOT EXISTS care_episode ("
                 + "id BIGINT NOT NULL AUTO_INCREMENT, patient_id BIGINT NOT NULL, "
                 + "episode_type VARCHAR(24) NOT NULL DEFAULT 'OUTPATIENT', "
@@ -54,6 +55,14 @@ public final class CareEpisodeSchemaInitializer {
             jdbc.execute("ALTER TABLE pre_triage_session ADD COLUMN episode_id BIGINT");
         } catch (org.springframework.jdbc.BadSqlGrammarException alreadyExists) {
             // MySQL/H2 both report a grammar error for an already existing column; this is the expected idempotent path.
+        }
+    }
+
+    private void ensureMemoryColumn() {
+        try {
+            jdbc.execute("ALTER TABLE pre_triage_session ADD COLUMN memory_summary VARCHAR(1000)");
+        } catch (org.springframework.jdbc.BadSqlGrammarException alreadyExists) {
+            // Existing installations already contain the column.
         }
     }
 }

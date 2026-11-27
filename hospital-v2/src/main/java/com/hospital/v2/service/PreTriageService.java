@@ -42,6 +42,22 @@ public class PreTriageService {
                 + "VALUES (:patient_id,:episode_id,'ACTIVE')", m);
     }
 
+    /**
+     * 找回患者尚未结束的最近一次会话。
+     * 会话恢复不能依赖浏览器 localStorage：换设备、清理缓存或重新登录后，
+     * 服务端仍必须知道患者正在推进哪一次就诊任务，否则智能体会退化成每次从零开始。
+     */
+    public Map<String, Object> resumableSession(long patientId) {
+        return db.queryOne("SELECT s.id AS session_id, s.episode_id, s.status AS session_status, "
+                        + "s.locked, e.status AS episode_status "
+                        + "FROM pre_triage_session s "
+                        + "LEFT JOIN care_episode e ON e.id=s.episode_id "
+                        + "WHERE s.patient_id=:patient "
+                        + "AND (e.id IS NULL OR e.status NOT IN ('COMPLETED','CANCELLED')) "
+                        + "ORDER BY s.update_time DESC, s.id DESC LIMIT 1",
+                Map.of("patient", patientId));
+    }
+
     public boolean isLocked(long sessionId) {
         Map<String, Object> row = db.queryOne("SELECT locked FROM pre_triage_session WHERE id=:id", Map.of("id", sessionId));
         return row != null && ((Number) row.get("locked")).intValue() == 1;
@@ -53,6 +69,7 @@ public class PreTriageService {
         m.put("role", "user");
         m.put("content", text);
         db.insert("INSERT INTO pre_triage_message (session_id, role, content) VALUES (:session_id,:role,:content)", m);
+        refreshMemorySummary(sessionId);
     }
 
     public void appendAssistant(long sessionId, String text) {
@@ -113,6 +130,36 @@ public class PreTriageService {
                 Map.of("s", sessionId));
     }
 
+    /** 返回落库的会话记忆摘要，供恢复接口和模型上下文共同使用。 */
+    public String memorySummary(long sessionId) {
+        Map<String, Object> row = db.queryOne("SELECT memory_summary FROM pre_triage_session WHERE id=:id",
+                Map.of("id", sessionId));
+        return row == null || row.get("memory_summary") == null ? "" : String.valueOf(row.get("memory_summary"));
+    }
+
+    /**
+     * 将患者跨轮次表达压缩为可恢复的事实摘要。
+     * 原始消息仍完整保留；摘要只作为长上下文/换设备恢复时的索引，不替代原始证据。
+     */
+    private void refreshMemorySummary(long sessionId) {
+        List<Map<String, Object>> rows = db.query(
+                "SELECT content FROM pre_triage_message WHERE session_id=:s AND role='user' ORDER BY id",
+                Map.of("s", sessionId));
+        if (rows.isEmpty()) return;
+        StringBuilder summary = new StringBuilder("本次就诊已记录：");
+        int start = Math.max(0, rows.size() - 4);
+        for (int i = start; i < rows.size(); i++) {
+            String item = String.valueOf(rows.get(i).getOrDefault("content", "")).trim();
+            if (item.isBlank()) continue;
+            if (summary.length() > 10) summary.append("；");
+            summary.append(item);
+        }
+        String value = summary.toString();
+        if (value.length() > 1000) value = value.substring(value.length() - 1000);
+        db.update("UPDATE pre_triage_session SET memory_summary=:memory, update_time=CURRENT_TIMESTAMP WHERE id=:id",
+                Map.of("memory", value, "id", sessionId));
+    }
+
     public String triageComplaint(long sessionId, String supplemental) {
         List<String> statements = history(sessionId).stream()
                 .filter(row -> "user".equals(String.valueOf(row.get("role"))))
@@ -151,11 +198,17 @@ public class PreTriageService {
 
     private String promptFor(long sessionId) {
         Map<String, Object> session = db.queryOne(
-                "SELECT patient_id FROM pre_triage_session WHERE id=:id", Map.of("id", sessionId));
+                "SELECT patient_id, memory_summary FROM pre_triage_session WHERE id=:id", Map.of("id", sessionId));
         StringBuilder prompt = new StringBuilder(PRE_SYS)
                 .append("\n你必须结合本次会话中的历史消息继续追问，不能重复已经回答过的问题。")
                 .append("如果患者表达了预约/挂号意图，先完成必要的症状与安全确认；信息齐全后由系统自动查询真实号源，")
                 .append("不要要求患者点击生成、刷新或重新分诊，也不要声称已经替患者预约。\n");
+        String memory = session == null || session.get("memory_summary") == null
+                ? "" : String.valueOf(session.get("memory_summary"));
+        if (!memory.isBlank()) {
+            prompt.append("已落库的本次就诊记忆（必须继续使用，不能当作新患者）：")
+                    .append(memory).append("\n");
+        }
         if (session != null && session.get("patient_id") != null) {
             Map<String, Object> profile = db.queryOne(
                     "SELECT name, gender, age, allergic_history, past_history FROM patient_profile WHERE id=:id",

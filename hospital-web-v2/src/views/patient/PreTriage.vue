@@ -169,15 +169,40 @@ async function refreshEpisode() {
 }
 async function restoreSession() {
   const previousSession = sessionId.value
-  const saved = localStorage.getItem('carenexus_pretriage_session'); if (!saved) return false
+  let saved = localStorage.getItem('carenexus_pretriage_session')
   try {
+    if (!saved) {
+      const current = await api.get('/patient/session/current')
+      if (!current || current.status === 'EMPTY' || !current.session_id) return false
+      saved = String(current.session_id)
+      localStorage.setItem('carenexus_pretriage_session', saved)
+    }
     const data = await api.get('/patient/session/history', { sessionId: Number(saved) })
     if (disposed || sessionId.value !== previousSession) return true
     sessionId.value = data.sessionId; episode.value = data.episode || null; locked.value = Number(data.locked) === 1 || data.status === 'LOCKED'; msgs.value = (data.messages || []).map(m => ({ role: m.role === 'assistant' ? 'bot' : 'user', text: m.content }))
     if (data.suggestion) { sug.value = data.suggestion; suggested.value = true; needsReview.value = !!data.suggestion.needs_confirmation; registered.value = Number(data.suggestion.registered) === 1 || !!data.registration; if (data.registration) reg.value = data.registration; lastUpdated.value = new Date(); if (!needsReview.value && !registered.value && data.suggestion.status === 'CONFIRMED') await loadSlots() }
     scroll()
     return true
-  } catch { localStorage.removeItem('carenexus_pretriage_session'); return false }
+  } catch {
+    // 本地缓存可能指向过期会话；先丢弃缓存，再以服务端索引为准恢复一次。
+    localStorage.removeItem('carenexus_pretriage_session')
+    if (saved) {
+      try {
+        const current = await api.get('/patient/session/current')
+        if (current?.session_id) {
+          localStorage.setItem('carenexus_pretriage_session', String(current.session_id))
+          const data = await api.get('/patient/session/history', { sessionId: Number(current.session_id) })
+          sessionId.value = data.sessionId; episode.value = data.episode || null
+          locked.value = Number(data.locked) === 1 || data.status === 'LOCKED'
+          msgs.value = (data.messages || []).map(m => ({ role: m.role === 'assistant' ? 'bot' : 'user', text: m.content }))
+          if (data.suggestion) { sug.value = data.suggestion; suggested.value = true; needsReview.value = !!data.suggestion.needs_confirmation; registered.value = Number(data.suggestion.registered) === 1 || !!data.registration; if (data.registration) reg.value = data.registration; if (!needsReview.value && !registered.value && data.suggestion.status === 'CONFIRMED') await loadSlots() }
+          scroll()
+          return true
+        }
+      } catch { /* 服务端没有可恢复会话，保持空白新会话 */ }
+    }
+    return false
+  }
 }
 onMounted(async () => {
   await loadProfile(); await restoreSession()
@@ -189,16 +214,24 @@ onMounted(async () => {
 })
 onUnmounted(() => { disposed = true; chatAbort?.abort(); window.clearInterval(statusTimer) })
 function scroll() { nextTick(() => { if (box.value) box.value.scrollTop = box.value.scrollHeight }) }
-async function startRequest() { const r = await api.post('/patient/session'); sessionId.value = r.sessionId; episode.value = { id: r.episodeId, status: r.episodeStatus, current_action: r.nextAction }; localStorage.setItem('carenexus_pretriage_session', String(r.sessionId)); msgs.value = []; locked.value = false; suggested.value = false; needsReview.value = false; registered.value = false; sug.value = {}; slots.value = []; selectedSlotId.value = null; showAllSlots.value = false; lastUpdated.value = null }
+async function startRequest(forceNew = true) {
+  const r = await api.post('/patient/session', { forceNew })
+  sessionId.value = r.sessionId
+  localStorage.setItem('carenexus_pretriage_session', String(r.sessionId))
+  // 服务端命中可恢复会话时必须重新加载消息、分诊建议和预约状态，不能只拿到 sessionId 后清空页面。
+  if (r.resumed) { await restoreSession(); return }
+  episode.value = { id: r.episodeId, status: r.episodeStatus, current_action: r.nextAction }
+  msgs.value = []; locked.value = false; suggested.value = false; needsReview.value = false; registered.value = false; sug.value = {}; slots.value = []; selectedSlotId.value = null; showAllSlots.value = false; lastUpdated.value = null
+}
 async function start() {
   if (busy.value || streaming.value || refreshing.value || disposed) return
   busy.value = true
-  try { await startRequest() } finally { busy.value = false }
+  try { await startRequest(true) } finally { busy.value = false }
 }
 async function send() {
   if (busy.value || refreshing.value || disposed) return
   const text = input.value.trim(); if (!text || streaming.value) return
-  if (!sessionId.value || locked.value) { busy.value = true; try { await startRequest() } catch (e) { ElMessage.error(e.response?.data?.msg || '暂时无法开始对话'); return } finally { busy.value = false } }
+  if (!sessionId.value || locked.value) { busy.value = true; try { await startRequest(!!locked.value) } catch (e) { ElMessage.error(e.response?.data?.msg || '暂时无法开始对话'); return } finally { busy.value = false } }
   msgs.value.push({ role: 'user', text }); input.value = ''; streaming.value = true
   const assistant = { role: 'bot', text: '', typing: true }; msgs.value.push(assistant); scroll()
   let delivered = false

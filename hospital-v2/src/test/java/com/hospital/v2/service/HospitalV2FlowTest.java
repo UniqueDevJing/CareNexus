@@ -64,6 +64,8 @@ class HospitalV2FlowTest {
         long sid = preTriage.startSession(1L);
         preTriage.appendUser(sid, "突发胸痛大汗");
         preTriage.appendUser(sid, "没有发热");
+        assertTrue(preTriage.memorySummary(sid).contains("突发胸痛大汗"));
+        assertTrue(preTriage.memorySummary(sid).contains("没有发热"));
         String complaint = preTriage.triageComplaint(sid, "没有发热");
         assertEquals("突发胸痛大汗，没有发热", complaint);
         assertEquals(1, agent.triage(sid, 1L, complaint).suggestion().get("red_flag"));

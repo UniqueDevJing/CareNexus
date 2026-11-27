@@ -60,6 +60,37 @@ class PatientNurseBoundaryTest {
     }
 
     @Test
+    void session_endpoint_resumes_server_memory_and_only_force_new_creates_a_session() throws Exception {
+        String patient = login("patient", "123456");
+        long first = startSession(patient);
+
+        String resumedBody = mvc.perform(post("/api/patient/session")
+                        .header("Authorization", "Bearer " + patient))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.resumed").value(true))
+                .andReturn().getResponse().getContentAsString();
+        long resumed = json.readTree(resumedBody).path("data").path("sessionId").asLong();
+        org.junit.jupiter.api.Assertions.assertEquals(first, resumed,
+                "重复进入患者端必须恢复原会话，不能把智能体上下文清空");
+
+        String currentBody = mvc.perform(get("/api/patient/session/current")
+                        .header("Authorization", "Bearer " + patient))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        org.junit.jupiter.api.Assertions.assertEquals(first,
+                json.readTree(currentBody).path("data").path("session_id").asLong());
+
+        String freshBody = mvc.perform(post("/api/patient/session")
+                        .header("Authorization", "Bearer " + patient)
+                        .param("forceNew", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.resumed").value(false))
+                .andReturn().getResponse().getContentAsString();
+        org.junit.jupiter.api.Assertions.assertNotEquals(first,
+                json.readTree(freshBody).path("data").path("sessionId").asLong());
+    }
+
+    @Test
     void patient_cannot_use_another_patients_session() throws Exception {
         String firstPatient = login("patient", "123456");
         String secondPatient = login("huimin", "123456");

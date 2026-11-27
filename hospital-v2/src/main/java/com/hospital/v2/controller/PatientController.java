@@ -57,13 +57,34 @@ public class PatientController {
 
     @PostMapping("/session")
     public Result<?> session(@RequestParam(required = false) Long patientId,
+                             @RequestParam(defaultValue = "false") boolean forceNew,
                              @AuthenticationPrincipal AuthPrincipal principal) {
         long ownPatientId = currentUser.patientId(principal, patientId);
+        if (!forceNew) {
+            Map<String, Object> existing = preTriage.resumableSession(ownPatientId);
+            if (existing != null) {
+                Map<String, Object> resumed = new LinkedHashMap<>();
+                resumed.put("sessionId", existing.get("session_id"));
+                resumed.put("episodeId", existing.get("episode_id"));
+                resumed.put("episodeStatus", existing.get("episode_status"));
+                resumed.put("sessionStatus", existing.get("session_status"));
+                resumed.put("resumed", true);
+                return Result.ok(resumed);
+            }
+        }
         Map<String, Object> episode = episodes.open(ownPatientId);
         long sessionId = preTriage.startSession(ownPatientId, ((Number) episode.get("id")).longValue());
         episodes.attachSession(((Number) episode.get("id")).longValue(), ownPatientId, sessionId);
         return Result.ok(Map.of("sessionId", sessionId, "episodeId", episode.get("id"),
-                "episodeStatus", episode.get("status"), "nextAction", episode.get("current_action")));
+                "episodeStatus", episode.get("status"), "nextAction", episode.get("current_action"),
+                "resumed", false));
+    }
+
+    /** 服务端会话索引：即使浏览器缓存被清理，也能找回正在推进的预约会话。 */
+    @GetMapping("/session/current")
+    public Result<?> currentSession(@AuthenticationPrincipal AuthPrincipal principal) {
+        Map<String, Object> current = preTriage.resumableSession(currentUser.patientId(principal, null));
+        return Result.ok(current == null ? Map.of("status", "EMPTY") : current);
     }
 
     /** 当前患者最近一条未完成的门诊任务，供刷新和跨页面恢复使用。 */
@@ -86,7 +107,7 @@ public class PatientController {
                                     @AuthenticationPrincipal AuthPrincipal principal) {
         currentUser.assertPatientOwnsSession(principal, sessionId);
         Map<String, Object> session = db.queryOne(
-                "SELECT id, patient_id, episode_id, status, locked, summary FROM pre_triage_session WHERE id=:id",
+                "SELECT id, patient_id, episode_id, status, locked, summary, memory_summary FROM pre_triage_session WHERE id=:id",
                 Map.of("id", sessionId));
         if (session == null) throw new BizException("预问诊会话不存在或已失效");
         Map<String, Object> out = new LinkedHashMap<>();
@@ -94,6 +115,7 @@ public class PatientController {
         out.put("status", session.get("status"));
         out.put("locked", session.get("locked"));
         out.put("summary", session.get("summary"));
+        out.put("memorySummary", session.get("memory_summary"));
         out.put("episodeId", session.get("episode_id"));
         if (session.get("episode_id") instanceof Number episodeId) {
             out.put("episode", episodes.currentForPatient(episodeId.longValue(),
