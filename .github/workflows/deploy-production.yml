@@ -96,7 +96,18 @@ jobs:
           PROD_PORT: ${{ secrets.PROD_PORT }}
           PROD_USER: ${{ secrets.PROD_USER }}
           SHA: ${{ github.sha }}
-        run: scp -P "${PROD_PORT:-22}" carenexus-release.tgz "${PROD_USER}@${PROD_HOST}:/tmp/carenexus-${SHA}.tgz"
+        # Keep the upload self-healing on a slow/intermittent SSH link. Without
+        # keepalives a half-written archive can leave the job running until it
+        # is manually cancelled, while the server still has the old release.
+        run: >-
+          scp -P "${PROD_PORT:-22}"
+          -o ConnectTimeout=30
+          -o ServerAliveInterval=30
+          -o ServerAliveCountMax=4
+          -o TCPKeepAlive=yes
+          -o IPQoS=throughput
+          carenexus-release.tgz
+          "${PROD_USER}@${PROD_HOST}:/tmp/carenexus-${SHA}.tgz"
 
       - name: Activate release and verify
         env:
@@ -108,7 +119,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ssh -p "${PROD_PORT:-22}" "${PROD_USER}@${PROD_HOST}" \
+          ssh -p "${PROD_PORT:-22}" \
+            -o ConnectTimeout=30 \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=4 \
+            -o TCPKeepAlive=yes \
+            "${PROD_USER}@${PROD_HOST}" \
             "APP_DIR='${PROD_APP_DIR:-/opt/hospital-v2}' RELEASE='${SHA}' bash -s" <<'REMOTE'
           set -Eeuo pipefail
 
