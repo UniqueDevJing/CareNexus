@@ -219,9 +219,14 @@ async function load() {
     if (selected.value) {
       const next = timelineItems.value.find(item => item.key === selected.value.key)
       if (next) selected.value = next
+      else { selected.value = null; detail.value = null; detailError.value = '' }
     }
   } catch (e) {
     error.value = e.response?.data?.msg || e.message || '请稍后重试'
+    regs.value = []
+    recs.value = []
+    selected.value = null
+    detail.value = null
     ElMessage.error(error.value)
   } finally {
     loading.value = false
