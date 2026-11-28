@@ -94,14 +94,22 @@ public class MedicalRecordService {
     }
 
     public Map<String, Object> detail(long recordId) {
-        return db.queryOne("SELECT r.*, d.name doctor_name, p.name patient_name FROM medical_record r "
+        return db.queryOne("SELECT r.*, d.name doctor_name, p.name patient_name, reg.work_date, reg.period, "
+                + "reg.status registration_status, reg.payment_status, reg.department_id, dep.name department_name "
+                + "FROM medical_record r "
                 + "LEFT JOIN doctor d ON d.id=r.doctor_id LEFT JOIN patient_profile p ON p.id=r.patient_id "
+                + "LEFT JOIN registration reg ON reg.id=r.registration_id "
+                + "LEFT JOIN department dep ON dep.id=reg.department_id "
                 + "WHERE r.id=:id", Map.of("id", recordId));
     }
 
     public List<Map<String, Object>> myRecords(Long patientId) {
-        return db.query("SELECT r.*, d.name doctor_name FROM medical_record r "
-                + "LEFT JOIN doctor d ON d.id=r.doctor_id WHERE r.patient_id=:p ORDER BY r.id DESC",
+        return db.query("SELECT r.*, d.name doctor_name, reg.work_date, reg.period, reg.status registration_status, "
+                        + "reg.payment_status, reg.department_id, dep.name department_name "
+                        + "FROM medical_record r LEFT JOIN doctor d ON d.id=r.doctor_id "
+                        + "LEFT JOIN registration reg ON reg.id=r.registration_id "
+                        + "LEFT JOIN department dep ON dep.id=reg.department_id "
+                        + "WHERE r.patient_id=:p ORDER BY reg.work_date DESC, r.id DESC",
                 Map.of("p", patientId));
     }
 

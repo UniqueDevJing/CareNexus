@@ -118,7 +118,11 @@ public class RegistrationService {
     }
 
     public List<Map<String, Object>> myRegistrations(Long patientId) {
-        return db.query("SELECT * FROM registration WHERE patient_id=:p ORDER BY id DESC",
+        return db.query("SELECT r.*, dep.name department_name, d.name doctor_name "
+                        + "FROM registration r "
+                        + "LEFT JOIN department dep ON dep.id=r.department_id "
+                        + "LEFT JOIN doctor d ON d.id=r.doctor_id "
+                        + "WHERE r.patient_id=:p ORDER BY r.work_date DESC, r.id DESC",
                 Map.of("p", patientId));
     }
 }
