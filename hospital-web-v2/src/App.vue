@@ -1,6 +1,6 @@
 <template>
   <router-view v-if="$route.meta.public" />
-  <div v-else class="app-shell" :class="{ 'nav-open': navOpen }" :data-role="role || 'workspace'">
+  <div v-else class="app-shell evidence-ledger-shell" :class="{ 'nav-open': navOpen }" :data-role="role || 'workspace'">
     <a class="skip-link" href="#main-workspace">跳到主要工作区</a>
     <button v-if="navOpen" class="nav-scrim" aria-label="关闭导航" @click="navOpen = false"></button>
 
@@ -31,7 +31,7 @@
     <main id="main-workspace" class="main" tabindex="-1">
       <header class="topbar">
         <button class="menu-button" :aria-expanded="navOpen" :aria-label="navOpen ? '关闭导航' : '打开导航'" @click="navOpen = !navOpen"><span></span><span></span></button>
-        <div class="page-head"><span class="page-kicker">CareNexus · {{ roleConfig.label }}</span><h1>{{ currentTitle }}</h1></div>
+        <div class="page-head"><span class="page-kicker">CareNexus · Evidence Ledger · {{ roleConfig.label }}</span><h1>{{ currentTitle }}</h1></div>
         <div class="topbar-session"><span class="topbar-date">{{ todayLabel }}</span><span class="session-state"><i aria-hidden="true"></i>{{ roleConfig.session }}</span><div class="user-chip"><span class="user-avatar role-avatar" :data-role="role">{{ roleConfig.avatar }}</span><div><strong>{{ user.name || user.username }}</strong><small>{{ roleConfig.label }}</small></div></div></div>
       </header>
       <div ref="routeStage" class="route-stage"><router-view /></div>
