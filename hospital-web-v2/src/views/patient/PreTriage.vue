@@ -158,7 +158,23 @@ const lastUpdated = ref(null)
 const profile = reactive({ name: '', gender: '男', age: null, past_history: '', allergic_history: '' })
 let statusTimer
 
-async function loadProfile() { const p = await api.get('/patient/profile'); if (p) Object.assign(profile, { name: p.name || '', gender: p.gender || '男', age: p.age, past_history: p.past_history || '', allergic_history: p.allergic_history || '' }) }
+const LEGACY_SESSION_KEY = 'carenexus_pretriage_session'
+function sessionKey() {
+  try {
+    const user = JSON.parse(localStorage.getItem('hospital_user') || '{}')
+    const identity = user.userId || user.username
+    return identity ? `carenexus_pretriage_session:${identity}` : null
+  } catch { return null }
+}
+function cacheSession(id) { const key = sessionKey(); if (key) localStorage.setItem(key, String(id)) }
+
+async function loadProfile() {
+  const p = await api.get('/patient/profile')
+  // 旧版本把会话 ID 写在一个全局 key 中，切换账号时会误把上一位患者的会话当成当前会话。
+  // 账号身份来自登录态，而不是患者输入的资料，避免通过修改表单影响会话隔离。
+  localStorage.removeItem(LEGACY_SESSION_KEY)
+  if (p) Object.assign(profile, { name: p.name || '', gender: p.gender || '男', age: p.age, past_history: p.past_history || '', allergic_history: p.allergic_history || '' })
+}
 async function saveProfile() { saving.value = true; try { await api.post('/patient/profile/save', null, profile); ElMessage.success('健康档案已保存') } finally { saving.value = false } }
 async function refreshEpisode() {
   try {
@@ -170,13 +186,15 @@ async function refreshEpisode() {
 }
 async function restoreSession() {
   const previousSession = sessionId.value
-  let saved = localStorage.getItem('carenexus_pretriage_session')
+  const key = sessionKey()
+  if (!key) return false
+  let saved = localStorage.getItem(key)
   try {
     if (!saved) {
       const current = await api.get('/patient/session/current')
       if (!current || current.status === 'EMPTY' || !current.session_id) return false
       saved = String(current.session_id)
-      localStorage.setItem('carenexus_pretriage_session', saved)
+      localStorage.setItem(key, saved)
     }
     const data = await api.get('/patient/session/history', { sessionId: Number(saved) })
     if (disposed || sessionId.value !== previousSession) return true
@@ -185,13 +203,13 @@ async function restoreSession() {
     scroll()
     return true
   } catch {
-    // 本地缓存可能指向过期会话；先丢弃缓存，再以服务端索引为准恢复一次。
-    localStorage.removeItem('carenexus_pretriage_session')
+    // 当前账号的本地缓存可能指向过期会话；先丢弃，再以服务端索引为准恢复一次。
+    localStorage.removeItem(key)
     if (saved) {
       try {
         const current = await api.get('/patient/session/current')
         if (current?.session_id) {
-          localStorage.setItem('carenexus_pretriage_session', String(current.session_id))
+          localStorage.setItem(key, String(current.session_id))
           const data = await api.get('/patient/session/history', { sessionId: Number(current.session_id) })
           sessionId.value = data.sessionId; episode.value = data.episode || null
           locked.value = Number(data.locked) === 1 || data.status === 'LOCKED'
@@ -218,7 +236,7 @@ function scroll() { nextTick(() => { if (box.value) box.value.scrollTop = box.va
 async function startRequest(forceNew = true) {
   const r = await api.post('/patient/session', { forceNew })
   sessionId.value = r.sessionId
-  localStorage.setItem('carenexus_pretriage_session', String(r.sessionId))
+  cacheSession(r.sessionId)
   // 服务端命中可恢复会话时必须重新加载消息、分诊建议和预约状态，不能只拿到 sessionId 后清空页面。
   if (r.resumed) { await restoreSession(); return }
   episode.value = { id: r.episodeId, status: r.episodeStatus, current_action: r.nextAction }

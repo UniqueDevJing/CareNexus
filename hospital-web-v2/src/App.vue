@@ -76,6 +76,12 @@ onUnmounted(() => motion?.revert())
 
 function logout() {
   fetch('/v2/api/auth/logout', { method: 'POST', credentials: 'same-origin' }).finally(() => {
+    try {
+      const current = JSON.parse(localStorage.getItem('hospital_user') || '{}')
+      const identity = current.userId || current.username
+      if (identity) localStorage.removeItem(`carenexus_pretriage_session:${identity}`)
+    } catch { /* 登录态损坏时仍继续清理并退出 */ }
+    localStorage.removeItem('carenexus_pretriage_session')
     localStorage.removeItem('hospital_user')
     window.location.assign('/CareNexus/login')
   })
