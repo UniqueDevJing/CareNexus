@@ -1,6 +1,6 @@
 <template>
   <section class="workspace data-workspace" aria-label="基础数据工作区">
-    <section class="page-intro"><div><span class="eyebrow">HOSPITAL MASTER DATA</span><h2>医院资源数据台</h2><p>统一维护科室、医生、排班、患者档案与分诊规则，所有变化直接进入实时业务链路。</p></div></section>
+    <section class="page-intro"><div><span class="eyebrow">医院主数据 · Hospital master data</span><h2>医院资源数据台</h2><p>统一维护科室、医生、排班、患者档案与分诊规则，所有变化直接进入实时业务链路。</p></div></section>
     <section v-if="loading || loadError" class="module-state" aria-live="polite">
       <span v-if="loading">正在同步医院基础数据…</span>
       <template v-else>

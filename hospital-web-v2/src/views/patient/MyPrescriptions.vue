@@ -1,6 +1,6 @@
 <template>
   <section class="workspace records-workspace" aria-label="我的处方">
-    <section class="page-intro"><div><span class="eyebrow">MY PRESCRIPTIONS</span><h2>我的处方</h2><p>查看药品、用法、费用和配药进度，避免重复询问门诊人员。</p></div><button class="secondary-button" @click="load">刷新处方</button></section>
+    <section class="page-intro"><div><span class="eyebrow">用药记录 · My prescriptions</span><h2>我的处方</h2><p>查看药品、用法、费用和配药进度，避免重复询问门诊人员。</p></div><button class="secondary-button" @click="load">刷新处方</button></section>
     <section class="billing-list">
       <div v-if="loading" class="surface records-state" role="status">正在同步处方与用药明细…</div>
       <div v-else-if="error" class="surface records-state records-state--error" role="alert"><strong>处方资料暂时无法加载</strong><span>{{ error }}</span><button class="text-button" type="button" @click="load">重新加载</button></div>
@@ -10,9 +10,9 @@
         <div class="rx-summary"><span>{{ rx.items?.length || 0 }} 项药品 · {{ rx.note || '按医生处方使用' }}</span><button class="text-button" type="button" @click="toggle(rx.id)">{{ expanded === rx.id ? '收起详情' : '查看完整处方 →' }}</button></div>
         <footer><strong>¥ {{ amount(rx.total_amount) }}</strong><router-link v-if="rx.bill_status === 'UNPAID'" class="primary-button" to="/patient/bills">去缴费 →</router-link><span v-else-if="rx.status === 'DISPENSED'" class="billing-paid">已发药，请到药房取药</span><span v-else>费用已支付，等待药房配药</span></footer>
         <section v-if="expanded === rx.id" class="prescription-detail" aria-live="polite">
-          <div class="inline-detail-head"><span class="eyebrow">PRESCRIPTION DETAIL</span><strong>{{ statusLabel(rx) }}</strong></div>
+          <div class="inline-detail-head"><span class="eyebrow">处方详情 · Prescription detail</span><strong>{{ statusLabel(rx) }}</strong></div>
           <dl class="detail-grid"><div><dt>开方医生</dt><dd>{{ rx.doctor_name || '门诊医生' }}</dd></div><div><dt>开方时间</dt><dd>{{ rx.create_time || '—' }}</dd></div><div><dt>费用状态</dt><dd>{{ billLabel(rx.bill_status) }}</dd></div><div><dt>处方状态</dt><dd>{{ statusLabel(rx) }}</dd></div></dl>
-          <div class="rx-items"><span class="eyebrow">MEDICATIONS</span><div v-for="item in (rx.items || [])" :key="item.id"><strong>{{ item.drug_name }}</strong><span>{{ item.dosage }} · {{ item.frequency }} · {{ item.days }} 天 · {{ item.quantity }} 份 · ¥{{ amount(item.amount) }}</span></div><p v-if="!rx.items?.length" class="detail-empty">处方明细尚未同步，请刷新后重试。</p></div>
+          <div class="rx-items"><span class="eyebrow">药品明细 · Medications</span><div v-for="item in (rx.items || [])" :key="item.id"><strong>{{ item.drug_name }}</strong><span>{{ item.dosage }} · {{ item.frequency }} · {{ item.days }} 天 · {{ item.quantity }} 份 · ¥{{ amount(item.amount) }}</span></div><p v-if="!rx.items?.length" class="detail-empty">处方明细尚未同步，请刷新后重试。</p></div>
           <p v-if="rx.note" class="prescription-note">用药说明：{{ rx.note }}</p>
         </section>
       </article>

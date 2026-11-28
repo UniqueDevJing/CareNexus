@@ -1,6 +1,6 @@
 <template>
   <section class="workspace symptom-workspace" aria-label="症状标签库工作区">
-    <section class="page-intro"><div><span class="eyebrow">TRIAGE ONTOLOGY</span><h2>症状与安全规则图谱</h2><p>从患者表达，到科室路由，再到危急硬拦截：在一张三层规则图谱中维护分诊行为。</p></div></section>
+    <section class="page-intro"><div><span class="eyebrow">分诊规则 · Triage ontology</span><h2>症状与安全规则图谱</h2><p>从患者表达，到科室路由，再到危急硬拦截：在一张三层规则图谱中维护分诊行为。</p></div></section>
     <section v-if="loading || loadError" class="module-state" aria-live="polite">
       <span v-if="loading">正在同步症状与安全规则…</span>
       <template v-else>

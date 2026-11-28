@@ -1021,3 +1021,82 @@ body { background: var(--paper); color: var(--ink); }
   .evidence-ledger-shell .care-steps { overflow-x: auto; }
   .evidence-ledger-shell .care-step { min-width: 138px; }
 }
+
+/* Final interface audit: readable labels, restrained surfaces, and usable touch targets. */
+.evidence-ledger-shell .eyebrow,
+.evidence-ledger-shell .overview-kicker,
+.evidence-ledger-shell .detail-section-title,
+.evidence-ledger-shell .page-kicker {
+  letter-spacing: .04em;
+  text-transform: none;
+}
+.evidence-ledger-shell .eyebrow,
+.evidence-ledger-shell .overview-kicker,
+.evidence-ledger-shell .detail-section-title { font-size: 11px; line-height: 1.4; }
+.evidence-ledger-shell .page-kicker { font-size: 12px; }
+.evidence-ledger-shell h1,
+.evidence-ledger-shell h2,
+.evidence-ledger-shell h3,
+.evidence-ledger-shell p { text-wrap: pretty; }
+.evidence-ledger-shell .table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+.evidence-ledger-shell .table-scroll table { min-width: 720px; }
+.evidence-ledger-shell button:focus-visible,
+.evidence-ledger-shell a:focus-visible,
+.evidence-ledger-shell input:focus-visible,
+.evidence-ledger-shell textarea:focus-visible,
+.evidence-ledger-shell select:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+.evidence-ledger-shell .module-state--error,
+.evidence-ledger-shell .workspace-inline-error {
+  color: var(--rust);
+  border-color: #dfb9a9;
+  background: var(--rust-soft);
+}
+.evidence-ledger-shell .pipeline-map { background-image: none; position: relative; }
+.evidence-ledger-shell .pipeline-map::before {
+  position: absolute;
+  top: 18px;
+  bottom: 18px;
+  left: 50%;
+  width: 1px;
+  content: "";
+  background: rgba(43, 129, 118, .18);
+  pointer-events: none;
+}
+
+/* Login is the cover of the same paper ledger, rather than a separate visual system. */
+.evidence-ledger-login {
+  --paper: #f3eee4;
+  --surface: #fffdf8;
+  --surface-muted: #f8f4ec;
+  --ink: #222529;
+  --ink-soft: #6d716e;
+  --teal: #2b8176;
+  --teal-dark: #175b53;
+  --line: #d9d1c4;
+  --gold: #b68a52;
+  --shadow: 0 8px 18px rgba(53, 45, 32, .04);
+  background: var(--paper);
+}
+.evidence-ledger-login .login-story { background: #26302d; }
+.evidence-ledger-login .login-story::after { border-color: rgba(225, 240, 226, .13); box-shadow: none; }
+.evidence-ledger-login .login-panel { background: var(--paper); }
+.evidence-ledger-login .login-panel-inner { border-color: var(--line); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow); }
+.evidence-ledger-login .login-panel-label,
+.evidence-ledger-login .login-submit { color: var(--teal-dark); }
+.evidence-ledger-login .login-panel-label { letter-spacing: .04em; }
+.evidence-ledger-login .login-tabs { background: var(--surface-muted); }
+.evidence-ledger-login .login-tabs button.active { background: var(--surface); box-shadow: inset 0 -2px var(--teal); }
+.evidence-ledger-login .login-submit { color: #fff; border-color: var(--teal-dark); background: var(--teal-dark); }
+.evidence-ledger-login .login-submit:hover { background: #114b45; }
+
+@media (max-width: 600px) {
+  .evidence-ledger-login { display: block; }
+  .evidence-ledger-login .login-story { min-height: auto; padding: 24px 20px 28px; }
+  .evidence-ledger-login .login-story-main { margin: 58px 0 42px; }
+  .evidence-ledger-login .login-story h1 { font-size: clamp(40px, 12vw, 58px); }
+  .evidence-ledger-login .clinical-poster { margin-bottom: 20px; }
+  .evidence-ledger-login .login-panel { min-height: auto; padding: 32px 20px 40px; }
+}

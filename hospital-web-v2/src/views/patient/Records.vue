@@ -2,7 +2,7 @@
   <section class="workspace records-workspace" aria-label="就诊记录工作区">
     <section class="page-intro records-intro">
       <div>
-        <span class="eyebrow">MY CARE JOURNEY</span>
+        <span class="eyebrow">就诊历程 · My care journey</span>
         <h2>我的就诊记录</h2>
         <p>把预约、接诊和病历放在同一条时间线上，每一条记录都可以展开查看。</p>
       </div>
@@ -13,7 +13,7 @@
 
     <section class="records-overview" aria-label="就诊记录概览">
       <div class="overview-primary">
-        <span class="overview-kicker">CARE PATH</span>
+          <span class="overview-kicker">就诊路径 · Care path</span>
         <strong>你的就诊轨迹</strong>
         <p>从预约到医生提交病历，状态和资料都会保留在这里。</p>
       </div>
@@ -26,7 +26,7 @@
       <div class="timeline-panel surface">
         <header class="panel-head records-panel-head">
           <div>
-            <span class="eyebrow">TIMELINE</span>
+            <span class="eyebrow">时间线 · Timeline</span>
             <h3>就诊时间线</h3>
           </div>
           <span class="panel-note">{{ timelineItems.length }} 条记录</span>
@@ -78,7 +78,7 @@
         <template v-if="selected">
           <header class="detail-header">
             <div>
-              <span class="eyebrow">{{ selected.kind === 'record' ? 'MEDICAL RECORD' : 'APPOINTMENT' }}</span>
+              <span class="eyebrow">{{ selected.kind === 'record' ? '电子病历 · Medical record' : '预约记录 · Appointment' }}</span>
               <h3>{{ selected.kind === 'record' ? (activeRecord.diagnosis || '本次接诊病历') : '预约就诊详情' }}</h3>
             </div>
             <span class="queue-status" :class="selectedStatusTone">{{ selectedStatusLabel }}</span>
@@ -110,7 +110,7 @@
             </section>
             <section v-if="activeRecord.id" class="linked-record">
               <div>
-                <span class="eyebrow">LINKED RECORD</span>
+                <span class="eyebrow">关联记录 · Linked record</span>
                 <strong>{{ activeRecord.diagnosis || '医生已提交病历' }}</strong>
                 <p>本次预约已经形成结构化病历，可继续查看七段内容。</p>
               </div>
@@ -134,7 +134,7 @@
         </template>
         <div v-else class="detail-placeholder">
           <span class="detail-placeholder-mark" aria-hidden="true">＋</span>
-          <span class="eyebrow">RECORD DETAIL</span>
+          <span class="eyebrow">记录详情 · Record detail</span>
           <h3>选择一条记录</h3>
           <p>点击左侧预约或病历，查看完整的就诊信息、状态和医生记录。</p>
         </div>

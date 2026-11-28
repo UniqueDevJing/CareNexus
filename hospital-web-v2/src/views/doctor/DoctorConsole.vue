@@ -1,7 +1,7 @@
 <template>
   <section class="workspace doctor-space" aria-label="医生接诊工作区" :inert="busy">
     <header class="work-header doctor-header">
-      <div><span class="eyebrow">医生工作台 / 今日接诊</span><h2>{{ currentUser.name || currentUser.username }}，从最早到诊的患者开始。</h2><p>队列、风险提示和结构化病历放在同一张接诊桌上，记录完成后再提交。</p></div>
+      <div><span class="eyebrow">医生工作台 · 今日接诊</span><h2>{{ currentUser.name || currentUser.username }}，从最早到诊的患者开始</h2><p>队列、风险提示和结构化病历放在同一张接诊桌上，记录完成后再提交。</p></div>
       <div class="work-header-actions"><div class="doctor-shift"><span class="status-pip"></span><div><strong>门诊进行中</strong><small>今日排班 · {{ pendingCount }} 位待接诊</small></div></div><button class="secondary-button" @click="load">刷新队列</button></div>
     </header>
 

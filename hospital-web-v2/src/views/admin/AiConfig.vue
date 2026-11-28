@@ -1,16 +1,16 @@
 <template>
   <section class="workspace model-workspace" aria-label="AI 模型配置工作区">
-    <section class="page-intro"><div><span class="eyebrow">MODEL RUNTIME</span><h2>AI 模型与提示词</h2><p>将对话模型和向量模型作为可切换的运行时资源管理，配置保存后立即生效。</p></div><button class="primary-button" @click="openNew">＋ 新增模型配置</button></section>
+    <section class="page-intro"><div><span class="eyebrow">模型运行 · Model runtime</span><h2>AI 模型与提示词</h2><p>将对话模型和向量模型作为可切换的运行时资源管理，配置保存后立即生效。</p></div><button class="primary-button" @click="openNew">新增模型配置</button></section>
     <div v-if="loading" class="surface module-state" role="status">正在同步模型配置…</div><div v-else-if="loadError" class="surface module-state module-state--error" role="alert"><span>{{ loadError }}</span><button class="text-button" type="button" @click="load">重新加载</button></div>
     <section class="model-stage">
       <article v-for="m in models" :key="m.id" :class="['model-card', { disabled: !m.enabled }]">
         <header><span class="provider-mark">{{ (m.provider || 'AI').slice(0, 2).toUpperCase() }}</span><span :class="['tool-state', m.enabled ? 'on' : 'off']"><i></i>{{ m.enabled ? '运行中' : '未启用' }}</span></header>
         <span class="eyebrow">{{ m.purpose }}</span><h3>{{ m.name }}</h3><code>{{ m.model }}</code>
-        <div class="model-endpoint"><span>API ENDPOINT</span><p>{{ m.base_url }}</p></div>
+        <div class="model-endpoint"><span>接口地址 · API endpoint</span><p>{{ m.base_url }}</p></div>
         <div class="model-capabilities"><span>{{ m.purpose === 'CHAT' ? '多轮对话' : '语义向量' }}</span><span>运行时热更新</span><span v-if="m.prompt_template">自定义 Prompt</span></div>
         <footer><button class="secondary-button" @click="openEdit(m)">编辑配置</button><button class="text-button" :disabled="m.purpose !== 'CHAT'" @click="test(m)">连通测试 →</button></footer>
       </article>
-      <button class="model-card model-card--new" @click="openNew"><span>＋</span><b>连接另一个模型</b><small>OpenAI-compatible API</small></button>
+      <button class="model-card model-card--new" @click="openNew"><span>＋</span><b>连接另一个模型</b><small>兼容主流模型接口</small></button>
     </section>
 
     <el-dialog v-model="dlg" :title="form.id ? '编辑配置' : '新增配置'" width="620px">

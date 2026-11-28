@@ -3,7 +3,7 @@
     <header class="patient-page-head">
       <div>
         <span class="eyebrow">患者服务 / 就诊准备</span>
-        <h2>把这次不舒服，先说给人听。</h2>
+        <h2>把这次不舒服，先说给人听</h2>
         <p>用几分钟补充症状和健康背景，系统会把信息整理给临床团队判断。</p>
       </div>
       <div class="patient-head-note"><span class="care-seal"><i></i></span><div><strong>隐私就诊</strong><small>信息只在本次就诊链路内使用</small></div></div>

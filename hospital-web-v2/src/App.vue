@@ -7,7 +7,7 @@
     <aside class="sidebar" aria-label="CareNexus 主导航">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true"><i></i></span>
-        <div class="brand-copy"><b>CareNexus</b><small>患者智能体</small></div>
+        <div class="brand-copy"><b>CareNexus</b><small>{{ brandSubtitle }}</small></div>
       </div>
 
       <div class="nav-context">
@@ -54,6 +54,12 @@ const user = computed(() => {
 })
 const role = computed(() => user.value.role)
 const roleConfig = computed(() => ({ ...getRoleMeta(role.value), ...getNavigation(role.value) }))
+const brandSubtitle = computed(() => ({
+  patient: '患者智能体',
+  doctor: '医生接诊工作台',
+  nurse: '临床接管工作台',
+  admin: '运营与安全工作台'
+}[role.value] || '门诊协同系统'))
 const currentTitle = computed(() => route.meta?.title || '智慧医院')
 const todayLabel = new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' }).format(new Date())
 let motion

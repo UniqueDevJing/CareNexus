@@ -1,6 +1,6 @@
 <template>
   <section class="workspace registry-workspace" aria-label="工具注册表工作区">
-    <section class="page-intro"><div><span class="eyebrow">MCP TOOL REGISTRY</span><h2>Agent 能力注册中心</h2><p>每个已启用工具都会进入模型的实时能力清单。先验证，再开放给决策链。</p></div><button class="primary-button" @click="openReg(null)">＋ 注册新工具</button></section>
+    <section class="page-intro"><div><span class="eyebrow">工具注册 · Tool registry</span><h2>Agent 能力注册中心</h2><p>每个已启用工具都会进入模型的实时能力清单。先验证，再开放给决策链。</p></div><button class="primary-button" @click="openReg(null)">注册新工具</button></section>
     <div v-if="loading" class="surface module-state" role="status">正在同步工具注册表…</div><div v-else-if="loadError" class="surface module-state module-state--error" role="alert"><span>{{ loadError }}</span><button class="text-button" type="button" @click="load">重新加载</button></div>
     <section class="registry-summary"><div><strong>{{ tools.length }}</strong><span>已注册工具</span></div><div><strong>{{ tools.filter(t => t.enabled).length }}</strong><span>当前启用</span></div><div><strong>{{ tools.filter(t => !t.enabled).length }}</strong><span>待校验 / 停用</span></div><p><i></i>运行时工具池已同步</p></section>
     <section class="tool-grid">

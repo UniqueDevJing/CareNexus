@@ -1,5 +1,5 @@
 <template>
-  <main ref="page" class="login-page">
+  <main ref="page" class="login-page evidence-ledger-login">
     <section class="login-story" aria-labelledby="login-story-title">
       <div class="login-story-top">
         <div class="login-brand">
@@ -11,12 +11,12 @@
 
       <div class="login-story-main" data-enter>
         <span class="login-kicker">一条完整的就诊链路</span>
-        <h1 id="login-story-title">先听见患者，<br><em>再开始治疗。</em></h1>
+        <h1 id="login-story-title">先听见患者，<br><em>再开始治疗</em></h1>
         <p>把患者的描述、临床接管和医生记录放在同一条可追溯的就诊路径里。</p>
       </div>
 
       <div class="clinical-poster" aria-label="CareNexus 就诊链路示意">
-        <div class="poster-heading"><span>就诊路径</span><strong>CARE PATH 01</strong></div>
+        <div class="poster-heading"><span>就诊路径</span><strong>Care path 01</strong></div>
         <div class="poster-line" aria-hidden="true"><i></i><b></b><i></i><b></b><i></i></div>
         <div class="poster-steps">
           <span><b>01</b><strong>患者描述</strong><small>先把不适说清楚</small></span>
@@ -33,13 +33,13 @@
       <div class="login-panel-inner">
         <div class="login-panel-heading">
           <span class="login-panel-label">进入门诊工作台</span>
-          <h2>{{ mode === 'login' ? '欢迎回来' : '建立患者档案' }}</h2>
-          <p>{{ mode === 'login' ? '从一句话开始，系统只在需要时邀请医护接手。' : '建立档案后，你的症状、安排和记录可以被连续保存。' }}</p>
+          <h2>{{ mode === 'login' ? '进入工作台' : '建立患者档案' }}</h2>
+          <p>{{ mode === 'login' ? '从一句话开始，需要人工判断时再交给对应的临床人员。' : '建立档案后，你的症状、安排和记录可以连续保存。' }}</p>
         </div>
 
         <div class="identity-strip" aria-label="服务范围">
           <span><i class="identity-dot identity-dot--patient">患</i><b>患者优先</b></span>
-        <span class="identity-note">医生与运营人员从专用入口处理需要人工判断的事项</span>
+        <span class="identity-note">医生、护士与运营人员从专用入口处理需要人工判断的事项</span>
         </div>
 
         <div class="login-tabs" role="tablist" aria-label="登录或注册">

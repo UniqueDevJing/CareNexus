@@ -14,7 +14,7 @@
     </section>
 
     <section class="surface review-panel" v-if="manualReviews.length">
-      <header class="panel-head"><div><span class="eyebrow">HUMAN REVIEW QUEUE</span><h3>待人工导诊</h3></div><span class="panel-note">低证据、异常或需人工确认的分诊</span></header>
+      <header class="panel-head"><div><span class="eyebrow">人工复核队列 · Human review</span><h3>待人工导诊</h3></div><span class="panel-note">低证据、异常或需人工确认的分诊</span></header>
       <div class="run-feed">
           <article v-for="item in manualReviews" :key="item.suggestion_id" class="review-row">
             <span class="run-state" :class="item.red_flag ? 'fail' : item.status === 'NEED_MORE_INFO' ? 'wait' : 'ok'"></span>
@@ -47,7 +47,7 @@
       </article>
 
       <article class="surface department-panel">
-        <header class="panel-head"><div><span class="eyebrow">DEPARTMENT FIT</span><h3>科室转化表现</h3></div></header>
+        <header class="panel-head"><div><span class="eyebrow">科室匹配 · Department fit</span><h3>科室转化表现</h3></div></header>
         <div class="rank-list">
           <div v-for="(d, i) in byDept" :key="d.department" class="rank-row">
             <span class="rank-index">{{ String(i + 1).padStart(2, '0') }}</span>
@@ -60,7 +60,7 @@
     </section>
 
     <section class="surface capacity-panel">
-      <header class="panel-head"><div><span class="eyebrow">CLINICAL CAPACITY</span><h3>医生与号源负载</h3></div><span class="panel-note">按当前排班实时计算</span></header>
+      <header class="panel-head"><div><span class="eyebrow">临床负载 · Clinical capacity</span><h3>医生与号源负载</h3></div><span class="panel-note">按当前排班实时计算</span></header>
       <div class="doctor-grid">
         <article v-for="d in (enh.byDoctor || [])" :key="d.id" class="doctor-capacity">
           <div class="doctor-avatar">{{ (d.name || '医').slice(0, 1) }}</div>
@@ -73,7 +73,7 @@
     </section>
 
     <section v-if="selected" class="surface trace-panel">
-      <header class="panel-head"><div><span class="eyebrow">TRACE / #{{ selected }}</span><h3>决策执行详情</h3></div><button class="text-button" @click="selected = null">关闭详情</button></header>
+      <header class="panel-head"><div><span class="eyebrow">执行追踪 · #{{ selected }}</span><h3>决策执行详情</h3></div><button class="text-button" @click="selected = null">关闭详情</button></header>
       <div class="trace-grid">
         <div class="timeline-list">
           <article v-for="s in timeline" :key="s.step_index" class="timeline-step">

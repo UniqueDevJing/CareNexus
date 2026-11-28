@@ -1,7 +1,7 @@
 <template>
   <section class="workspace billing-workspace" aria-label="我的账单">
     <section class="page-intro">
-      <div><span class="eyebrow">MY BILLING</span><h2>费用与支付</h2><p>每一笔费用都有对应的就诊业务和支付流水。</p></div>
+      <div><span class="eyebrow">费用记录 · My billing</span><h2>费用与支付</h2><p>每一笔费用都有对应的就诊业务和支付流水。</p></div>
       <div class="billing-balance"><span>账户余额</span><strong>¥ {{ formatAmount(balance) }}</strong><button class="text-button" @click="loadBalance">刷新余额</button></div>
     </section>
 
@@ -20,7 +20,7 @@
           <div v-if="detailLoading" class="detail-loading">正在读取完整账单…</div>
           <div v-else-if="detailError" class="detail-loading detail-loading--error">{{ detailError }} <button class="text-button" type="button" @click="loadBillDetail(bill.id)">重试</button></div>
           <template v-else-if="activeDetail">
-            <div class="inline-detail-head"><span class="eyebrow">PAYMENT TRACE</span><strong>{{ activeDetail.status === 'PAID' ? '支付已落账' : statusLabel(activeDetail.status) }}</strong></div>
+            <div class="inline-detail-head"><span class="eyebrow">支付流水 · Payment trace</span><strong>{{ activeDetail.status === 'PAID' ? '支付已落账' : statusLabel(activeDetail.status) }}</strong></div>
             <dl class="detail-grid"><div><dt>业务类型</dt><dd>{{ typeLabel(activeDetail.bill_type) }}</dd></div><div><dt>业务编号</dt><dd>#{{ activeDetail.source_id || '—' }}</dd></div><div><dt>账单生成</dt><dd>{{ activeDetail.create_time || '—' }}</dd></div><div><dt>支付完成</dt><dd>{{ activeDetail.paid_at || '尚未支付' }}</dd></div></dl>
             <div class="payment-trace"><span class="eyebrow">流水记录</span><template v-if="activeDetail.payments?.length"><div v-for="payment in activeDetail.payments" :key="payment.id" class="payment-trace-row"><strong>{{ payment.transaction_type === 'REFUND' ? '退款' : '支付' }}</strong><span>{{ payment.channel }} · {{ payment.status }}</span><b>¥ {{ formatAmount(payment.amount) }}</b><small>{{ payment.created_at || '—' }}</small></div></template><p v-else class="detail-empty">暂无支付流水，完成支付后会在此保留凭证。</p></div>
           </template>
