@@ -82,7 +82,7 @@ class PatientNurseBoundaryTest {
     }
 
     @Test
-    void session_endpoint_resumes_server_memory_and_rejects_duplicate_force_new() throws Exception {
+    void session_endpoint_resumes_server_memory_and_force_new_starts_a_clean_session() throws Exception {
         String patient = login("patient", "123456");
         long first = startSession(patient);
 
@@ -106,10 +106,11 @@ class PatientNurseBoundaryTest {
                         .header("Authorization", "Bearer " + patient)
                         .param("forceNew", "true"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.resumed").value(true))
+                .andExpect(jsonPath("$.data.resumed").value(false))
                 .andReturn().getResponse().getContentAsString();
-        org.junit.jupiter.api.Assertions.assertEquals(first,
-                json.readTree(freshBody).path("data").path("sessionId").asLong());
+        long fresh = json.readTree(freshBody).path("data").path("sessionId").asLong();
+        org.junit.jupiter.api.Assertions.assertNotEquals(first, fresh,
+                "明确开始新咨询时不能恢复旧会话，否则患者会看到上一轮症状");
     }
 
     @Test

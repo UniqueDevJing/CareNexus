@@ -158,6 +158,27 @@ class HospitalV2FlowTest {
     }
 
     @Test
+    void fresh_consultation_archives_previous_intake_instead_of_resuming_it() {
+        Map<String, Object> oldEpisode = episodes.open(1L);
+        long oldEpisodeId = ((Number) oldEpisode.get("id")).longValue();
+        long oldSessionId = preTriage.startSession(1L, oldEpisodeId);
+        episodes.attachSession(oldEpisodeId, 1L, oldSessionId);
+        preTriage.appendUser(oldSessionId, "旧咨询症状");
+
+        Map<String, Object> freshEpisode = episodes.openFresh(1L);
+        long freshEpisodeId = ((Number) freshEpisode.get("id")).longValue();
+
+        assertNotEquals(oldEpisodeId, freshEpisodeId);
+        assertEquals("DONE", db.queryOne("SELECT status FROM pre_triage_session WHERE id=:id",
+                Map.of("id", oldSessionId)).get("status"));
+        assertEquals(1, ((Number) db.queryOne("SELECT locked FROM pre_triage_session WHERE id=:id",
+                Map.of("id", oldSessionId)).get("locked")).intValue());
+        assertEquals(CareEpisodeService.CANCELLED, db.queryOne("SELECT status FROM care_episode WHERE id=:id",
+                Map.of("id", oldEpisodeId)).get("status"));
+        assertEquals(freshEpisodeId, ((Number) episodes.latestForPatient(1L).get("id")).longValue());
+    }
+
+    @Test
     void critical_complaint_hard_routes_to_emergency() {
         long sid = preTriage.startSession(1L);
         TriageResult r = agent.triage(sid, 1L, "突发胸痛大汗");

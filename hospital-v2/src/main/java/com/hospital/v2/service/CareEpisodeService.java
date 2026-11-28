@@ -28,6 +28,7 @@ public class CareEpisodeService {
     public static final String WAITING_RESULTS = "WAITING_RESULTS";
     public static final String NEEDS_REVIEW = "NEEDS_REVIEW";
     public static final String COMPLETED = "COMPLETED";
+    public static final String CANCELLED = "CANCELLED";
     public static final String FOLLOW_UP = "FOLLOW_UP";
     public static final String EMERGENCY_GUIDANCE = "EMERGENCY_GUIDANCE";
 
@@ -50,6 +51,48 @@ public class CareEpisodeService {
         createTask(episodeId, "COLLECT_SYMPTOMS", "OPEN", "NORMAL", "补充症状和就诊目标",
                 "告诉我最困扰你的症状、持续时间，以及是否想预约门诊。", "PATIENT");
         return currentForPatient(episodeId, patientId);
+    }
+
+    /**
+     * 开始新的预问诊前，归档同一患者尚未完成的旧收集任务。
+     * 已预约/已到院的就诊任务不被撤销，避免“开始新咨询”误伤已有预约。
+     */
+    @Transactional
+    public Map<String, Object> openFresh(long patientId) {
+        if (patientId <= 0) throw new BizException("患者身份无效，无法开始就诊任务");
+        List<Map<String, Object>> active = db.query(
+                "SELECT s.id AS session_id, s.episode_id, e.status AS episode_status "
+                        + "FROM pre_triage_session s LEFT JOIN care_episode e ON e.id=s.episode_id "
+                        + "WHERE s.patient_id=:patient AND s.status='ACTIVE' AND s.locked=0 "
+                        + "ORDER BY s.id FOR UPDATE",
+                Map.of("patient", patientId));
+        for (Map<String, Object> row : active) {
+            long sessionId = ((Number) row.get("session_id")).longValue();
+            db.update("UPDATE pre_triage_session SET status='DONE', locked=1, "
+                            + "summary=:summary, update_time=CURRENT_TIMESTAMP "
+                            + "WHERE id=:id AND patient_id=:patient AND status='ACTIVE' AND locked=0",
+                    Map.of("summary", "患者开始新的预问诊", "id", sessionId, "patient", patientId));
+            if (!(row.get("episode_id") instanceof Number episodeId)) continue;
+            String status = String.valueOf(row.get("episode_status"));
+            if (!canAbandonForFreshConsultation(status)) continue;
+            int changed = db.update("UPDATE care_episode SET status=:to,current_action='CANCELLED', "
+                            + "summary=:summary,version=version+1,close_time=CURRENT_TIMESTAMP,update_time=CURRENT_TIMESTAMP "
+                            + "WHERE id=:id AND patient_id=:patient AND status=:from",
+                    Map.of("to", CANCELLED, "summary", "患者开始新的预问诊", "id", episodeId.longValue(),
+                            "patient", patientId, "from", status));
+            if (changed > 0) {
+                closeOpenTasks(episodeId.longValue());
+                appendEvent(episodeId.longValue(), status, CANCELLED, "EPISODE_CANCELLED",
+                        "PATIENT", patientId, "new-consultation:" + sessionId,
+                        "患者开始新的预问诊，旧的未完成任务已归档");
+            }
+        }
+        return open(patientId);
+    }
+
+    private boolean canAbandonForFreshConsultation(String status) {
+        return INTAKE.equals(status) || TRIAGED.equals(status) || SLOT_PROPOSED.equals(status)
+                || WAITING_CONFIRMATION.equals(status) || NEEDS_REVIEW.equals(status);
     }
 
     public Map<String, Object> currentForPatient(long episodeId, long patientId) {
