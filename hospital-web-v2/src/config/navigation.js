@@ -25,6 +25,13 @@ export const navigation = {
     links: [{ path: '/doctor/console', title: '接诊工作台', tag: '01', hint: '查看待处理患者' }],
     sections: [{ title: '临床工作', links: [{ path: '/doctor/console', title: '接诊工作台', tag: '01', hint: '查看待处理患者' }] }]
   },
+  nurse: {
+    label: '护士工作台',
+    description: '只处理需要人工接管的事项',
+    note: '分诊确认、患者补问和已支付处方发药均会写入审计记录。',
+    links: [{ path: '/nurse/triage', title: '临床接管台', tag: '01', hint: '处理分诊与发药队列' }],
+    sections: [{ title: '临床工作', links: [{ path: '/nurse/triage', title: '临床接管台', tag: '01', hint: '处理分诊与发药队列' }] }]
+  },
   admin: {
     label: '运营与安全',
     description: '只保留运行所需的配置入口',
@@ -71,6 +78,7 @@ export const navigation = {
 export const roleMeta = {
   patient: { label: '患者服务', description: '先把今天要解决的事说清楚', avatar: '患', session: '隐私连接已保护' },
   doctor: { label: '医生接诊', description: '只处理需要临床判断的事项', avatar: '医', session: '临床会话安全' },
+  nurse: { label: '护士工作台', description: '只处理需要人工接管的事项', avatar: '护', session: '临床会话安全' },
   admin: { label: '运营与安全', description: '只保留运行所需的配置入口', avatar: '运', session: '运行数据已同步' }
 }
 

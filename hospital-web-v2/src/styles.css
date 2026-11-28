@@ -92,6 +92,7 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .user-avatar { display: grid; width: 38px; height: 38px; place-items: center; color: var(--surface); border-radius: 50%; background: var(--forest); font: 500 14px/1 var(--display); }
 .role-avatar[data-role="patient"] { color: #6e5146; background: #e7cbbd; }
 .role-avatar[data-role="doctor"] { color: #314a66; background: #ced9e3; }
+.role-avatar[data-role="nurse"] { color: #2e665f; background: #cde6dc; }
 .role-avatar[data-role="admin"] { color: #755b2e; background: #ead9af; }
 .menu-button { display: none; }
 .route-stage { width: min(100%, 1460px); margin: 0 auto; }
@@ -124,9 +125,14 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .empty-state .empty-icon, .empty-state > span { display: grid; width: 34px; height: 34px; margin: 0 auto 12px; place-items: center; color: var(--teal-dark); border-radius: 50%; background: var(--sage); }
 .empty-state b { display: block; color: var(--ink); font-size: 13px; font-weight: 600; }
 .empty-state p { margin: 6px 0 0; font-size: 11px; }
+.empty-state--error .empty-icon { color: #9d4b39; background: #f3dfd8; }
+.workspace-inline-error { display: flex; align-items: center; gap: 9px; margin: 0 28px 14px; padding: 10px 12px; color: #8f4939; border: 1px solid #e6c9bf; border-radius: 8px; background: #fff8f5; font-size: 11px; }
+.workspace-inline-error strong { color: #703b30; }.workspace-inline-error span { flex: 1; }.workspace-inline-error--compact { margin: 0; padding: 8px 10px; }
+.nurse-tabs { display: flex; gap: 8px; }.nurse-tabs button { min-height: 40px; padding: 0 16px; color: var(--ink-soft); border: 1px solid var(--line); border-radius: 8px; background: var(--surface); cursor: pointer; }.nurse-tabs button.active { color: var(--teal-dark); border-color: var(--sage-strong); background: var(--sage); }.nurse-tabs small { margin-left: 5px; font: 10px var(--mono); }.nurse-grid { display: grid; grid-template-columns: minmax(280px, .45fr) minmax(0, 1fr); gap: 18px; }.nurse-list, .nurse-detail { padding: 20px; }.nurse-row { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; min-height: 68px; padding: 9px 5px; color: var(--ink); text-align: left; border: 0; border-bottom: 1px solid var(--line); background: transparent; cursor: pointer; }.nurse-row:hover, .nurse-row.active { background: var(--sage); }.nurse-row b, .nurse-row small, .pharmacy-row b, .pharmacy-row small { display: block; }.nurse-row small, .pharmacy-row small { margin-top: 4px; color: var(--ink-soft); font-size: 10px; }.nurse-facts { display: grid; gap: 12px; margin: 22px 0; }.nurse-facts div { padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: #faf9f4; }.nurse-facts dt { color: var(--ink-soft); font-size: 10px; }.nurse-facts dd { margin: 6px 0 0; color: var(--ink); font-size: 13px; line-height: 1.6; }.nurse-note { display: grid; gap: 7px; color: var(--ink-soft); font-size: 11px; }.nurse-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }.pharmacy-list { padding: 20px; }.pharmacy-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }.pharmacy-row b { font-size: 13px; }
 .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 19px; }
 .panel-head h3 { margin: 6px 0 0; color: var(--ink); font: 500 21px/1.2 var(--display); letter-spacing: -.035em; }
 .panel-note { color: var(--ink-soft); font-size: 11px; }
+.module-state { display: grid; min-height: 150px; place-items: center; gap: 8px; padding: 28px; color: var(--ink-soft); text-align: center; font-size: 12px; }.module-state strong { color: var(--ink); }.module-state--error { color: #8f4939; background: #fff8f5; }.module-state--error .text-button { justify-self: center; }
 
 /* Clinical identity objects. */
 .care-avatar { display: grid; width: 38px; height: 38px; flex: 0 0 auto; place-items: center; color: #6d4d42; border: 1px solid rgba(118, 77, 66, .12); border-radius: 50%; background: #e7cbbd; font: 600 13px/1 var(--display); }
@@ -290,7 +296,7 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .record-form label > span { color: var(--ink); }.record-form label > span b { display: inline-block; min-width: 23px; margin-right: 5px; color: var(--teal); font: 10px/1 var(--mono); }
 .record-form.locked { background: #f1f1eb; }.record-form.locked .el-input__wrapper, .record-form.locked .el-textarea__inner { background: #f7f7f2; }
 .record-actions { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 15px 28px; border-top: 1px solid var(--line); background: var(--surface); }.record-actions > span { color: var(--ink-soft); font-size: 10px; }.record-actions > div { display: flex; gap: 8px; }
-.clinical-orders { display: grid; gap: 16px; padding: 21px 28px 24px; border-top: 1px solid var(--line); background: var(--surface); }.order-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }.order-card { display: grid; gap: 11px; padding: 15px; border: 1px solid var(--line); border-radius: 10px; background: #faf9f4; }.order-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }.order-card-head strong { color: var(--ink); font-size: 13px; }.order-card-head small, .order-empty { color: var(--ink-soft); font-size: 10px; }.order-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }.order-fields .el-input:last-child { grid-column: 1 / -1; }.order-list { display: grid; gap: 5px; padding-top: 8px; border-top: 1px solid var(--line); }.order-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--ink); font-size: 11px; }.order-line small { color: var(--teal-dark); font-size: 10px; }
+.clinical-orders { display: grid; gap: 16px; padding: 21px 28px 24px; border-top: 1px solid var(--line); background: var(--surface); }.order-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }.order-card { display: grid; gap: 11px; padding: 15px; border: 1px solid var(--line); border-radius: 10px; background: #faf9f4; }.order-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }.order-card-head strong { color: var(--ink); font-size: 13px; }.order-card-head small, .order-empty { color: var(--ink-soft); font-size: 10px; }.order-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }.order-fields .el-input:last-child { grid-column: 1 / -1; }.order-list { display: grid; gap: 5px; padding-top: 8px; border-top: 1px solid var(--line); }.order-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 7px 0; color: var(--ink); text-align: left; border: 0; border-bottom: 1px dashed var(--line); background: transparent; cursor: pointer; font-size: 11px; }.order-line:hover { color: var(--teal-dark); }.order-line small { color: var(--teal-dark); font-size: 10px; }.order-detail { display: grid; gap: 4px; padding: 8px 10px; color: var(--ink-soft); border-radius: 6px; background: var(--sage); font-size: 10px; line-height: 1.45; }
 .canvas-placeholder { display: grid; min-height: 650px; place-content: center; justify-items: center; padding: 30px; text-align: center; }.canvas-placeholder h3 { margin: 10px 0 7px; font: 500 24px/1.25 var(--display); }.canvas-placeholder p { max-width: 320px; margin: 0; color: var(--ink-soft); font-size: 12px; line-height: 1.7; }.medical-cross { display: grid; width: 58px; height: 58px; margin-bottom: 16px; place-items: center; color: var(--teal); border: 1px solid #bed3c9; border-radius: 50%; background: var(--sage); font: 300 31px/1 var(--display); }
 
 
@@ -407,6 +413,14 @@ h1, h2, h3, h4, p { margin-top: 0; }
 .slot-empty-state { margin-top: 12px; padding: 14px; border: 1px dashed var(--vital-line, #cbd9d5); border-radius: 14px; background: var(--vital-panel-soft, #f4f8f6); }
 .slot-empty-state strong { display: block; color: var(--vital-ink, #163a36); font-size: 13px; }
 .slot-empty-state p { margin: 6px 0 10px; color: var(--vital-muted, #71827f); font-size: 12px; line-height: 1.6; }
+
+@media (max-width: 700px) {
+  .nurse-grid { grid-template-columns: 1fr; }
+  .nurse-actions { align-items: stretch; flex-direction: column; }
+  .nurse-actions button { width: 100%; }
+  .pharmacy-row { align-items: flex-start; flex-direction: column; }
+  .pharmacy-row button { width: 100%; }
+}
 .slot-empty-actions { display: flex; align-items: center; gap: 12px; }
 
 /* CareNexus product pass: quiet clinical desk, one clear action per screen. */

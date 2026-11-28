@@ -1,6 +1,7 @@
 <template>
   <section class="workspace knowledge-workspace" aria-label="医学知识库工作区">
     <section class="page-intro"><div><span class="eyebrow">CLINICAL KNOWLEDGE</span><h2>医学知识工作室</h2><p>组织可信资料，观察切片入库状态，并直接验证 Agent 的检索上下文。</p></div></section>
+    <div v-if="loading" class="surface module-state" role="status">正在同步知识库…</div><div v-else-if="loadError" class="surface module-state module-state--error" role="alert"><span>{{ loadError }}</span><button class="text-button" type="button" @click="loadBases">重新加载</button></div>
     <section class="knowledge-layout">
       <aside class="surface knowledge-library">
         <header class="panel-head"><div><span class="eyebrow">LIBRARY</span><h3>资料库</h3></div><span class="queue-count">{{ docs.length }}</span></header>
@@ -54,6 +55,8 @@ const pickFile = ref(null)
 const uploading = ref(false)
 const selectedDoc = ref(null)
 const reviewing = ref(false)
+const loading = ref(false)
+const loadError = ref('')
 const sourceForm = reactive({ sourceOrganization: '', sourceUrl: '', sourceVersion: '', sourceDoi: '', note: '' })
 
 function sourceLabel(doc) { return doc.source_organization || '来源待登记' }
@@ -101,23 +104,23 @@ async function doUpload() {
 }
 
 async function loadBases() {
+  loading.value = true; loadError.value = ''; bases.value = []; docs.value = []; selectedDoc.value = null
   try {
-    bases.value = await api.get('/admin/knowledge/bases')
+    bases.value = await api.get('/admin/knowledge/bases') || []
     if (bases.value.length) { baseId.value = bases.value[0].id; await loadDocs() }
-  } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '知识库加载失败') }
+  } catch (e) { loadError.value = e.response?.data?.msg || e.message || '知识库加载失败'; ElMessage.error(loadError.value) }
+  finally { loading.value = false }
 }
-async function loadDocs() { if (baseId.value) { try { docs.value = await api.get('/admin/knowledge/docs', { baseId: baseId.value }) } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '文档加载失败') } } }
+async function loadDocs() { if (baseId.value) { try { docs.value = await api.get('/admin/knowledge/docs', { baseId: baseId.value }) || []; selectedDoc.value = null } catch (e) { docs.value = []; selectedDoc.value = null; loadError.value = e.response?.data?.msg || e.message || '文档加载失败'; ElMessage.error(loadError.value) } } }
 async function addDoc() {
   if (!newTitle.value || !newContent.value) { ElMessage.warning('请填标题与内容'); return }
-  await api.post('/admin/knowledge/add', { baseId: baseId.value, title: newTitle.value, content: newContent.value })
-  ElMessage.success('已切片并向量化入库')
-  newTitle.value = ''; newContent.value = ''
-  loadDocs()
+  try { await api.post('/admin/knowledge/add', { baseId: baseId.value, title: newTitle.value, content: newContent.value }); ElMessage.success('已切片并向量化入库'); newTitle.value = ''; newContent.value = ''; await loadDocs() }
+  catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '文档入库失败') }
 }
 async function retrieve() {
   searched.value = true
-  const r = await api.get('/admin/knowledge/retrieve', { q: q.value, topK: 4 })
-  hits.value = (r || []).map(x => ({ ...x, score: (x.score || 0).toFixed(3) }))
+  try { const r = await api.get('/admin/knowledge/retrieve', { q: q.value, topK: 4 }); hits.value = (r || []).map(x => ({ ...x, score: (x.score || 0).toFixed(3) })) }
+  catch (e) { hits.value = []; loadError.value = e.response?.data?.msg || e.message || '检索失败'; ElMessage.error(loadError.value) }
 }
 onMounted(loadBases)
 </script>

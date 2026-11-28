@@ -19,12 +19,14 @@
         <header class="panel-head"><div><span class="eyebrow">今日队列</span><h3>待接诊患者</h3></div><span class="queue-count">{{ regs.length }}</span></header>
         <div class="queue-filter" role="tablist" aria-label="患者状态筛选"><button :class="{ active: queueFilter === 'all' }" @click="queueFilter = 'all'">全部 <small>{{ regs.length }}</small></button><button :class="{ active: queueFilter === 'pending' }" @click="queueFilter = 'pending'">待接诊 <small>{{ pendingCount }}</small></button><button :class="{ active: queueFilter === 'done' }" @click="queueFilter = 'done'">已完成 <small>{{ regs.length - pendingCount }}</small></button></div>
         <div class="queue-list">
-          <button v-for="row in visibleRegs" :key="row.registration_id" :class="['patient-row', { active: emr.registrationId === row.registration_id }]" @click="openEmr(row)">
+          <div v-if="loading" class="empty-state" role="status"><span class="empty-icon">…</span><b>正在同步接诊队列</b><p>不会展示上一位患者的旧数据。</p></div>
+          <div v-else-if="loadError" class="empty-state empty-state--error" role="alert"><span class="empty-icon">!</span><b>接诊队列暂时无法加载</b><p>{{ loadError }}</p><button class="text-button" type="button" @click="load">重新加载</button></div>
+          <button v-else v-for="row in visibleRegs" :key="row.registration_id" :class="['patient-row', { active: emr.registrationId === row.registration_id }]" @click="openEmr(row)">
             <span class="care-avatar care-avatar--patient">{{ (row.patient_name || '患').slice(0, 1) }}</span>
             <span class="patient-summary"><b>{{ row.patient_name }}</b><small>{{ row.gender }} · {{ row.age }} 岁 · {{ row.period }}</small></span>
             <span :class="['queue-status', row.status === 'DONE' ? 'done' : 'waiting']">{{ row.status === 'DONE' ? '已完成' : '待接诊' }}</span>
           </button>
-          <div v-if="!visibleRegs.length" class="empty-state"><span class="empty-icon">✓</span><b>{{ regs.length ? '这个筛选下暂无患者' : '当前没有待诊患者' }}</b><p>{{ regs.length ? '切换筛选查看完整队列。' : '新挂号会自动进入这里。' }}</p></div>
+          <div v-if="!loading && !loadError && !visibleRegs.length" class="empty-state"><span class="empty-icon">✓</span><b>{{ regs.length ? '这个筛选下暂无患者' : '当前没有待诊患者' }}</b><p>{{ regs.length ? '切换筛选查看完整队列。' : '新挂号会自动进入这里。' }}</p></div>
         </div>
       </aside>
 
@@ -36,6 +38,7 @@
           </header>
           <div class="clinical-alerts"><div><span>既往史</span><b>{{ activePatient.past_history || '暂无既往史记录' }}</b></div><div :class="{ alert: activePatient.allergic_history }"><span>过敏史</span><b>{{ activePatient.allergic_history || '暂无过敏记录' }}</b></div></div>
           <div class="record-progress" aria-label="病历填写进度"><span v-for="(label, i) in recordSections" :key="label" :class="{ filled: sectionFilled(i) }"><i>{{ i + 1 }}</i>{{ label }}</span></div>
+          <div v-if="detailError" class="workspace-inline-error" role="alert"><strong>病历详情暂时无法读取</strong><span>{{ detailError }}</span><button class="text-button" type="button" @click="retryActive">重试</button></div>
           <div class="record-form" :class="{ locked: emr.locked }">
             <div class="record-form-title"><div><span class="eyebrow">结构化病历</span><h4>本次接诊记录</h4></div><span>{{ emr.locked ? '已提交锁定' : '草稿自动保留在当前会话' }}</span></div>
             <label><span><b>01</b>主诉</span><el-input v-model="emr.chief_complaint" :disabled="emr.locked" placeholder="症状、持续时间与就诊原因" /></label>
@@ -52,14 +55,18 @@
                 <div class="order-card-head"><strong>开立检查</strong><small>结果由检验人员回填</small></div>
                 <div class="order-fields"><el-input v-model="examForm.itemName" :disabled="emr.locked || orderBusy" placeholder="检查项目，如：血常规" /><el-input v-model="examForm.itemCode" :disabled="emr.locked || orderBusy" placeholder="项目编码（可选）" /><el-input v-model="examForm.fee" :disabled="emr.locked || orderBusy" type="number" min="0" step="0.01" placeholder="费用（元）" /></div>
                 <button class="secondary-button" :disabled="emr.locked || orderBusy" @click="createExam">开立检查</button>
-                <div v-if="exams.length" class="order-list"><div v-for="exam in exams" :key="exam.id" class="order-line"><span>{{ exam.item_name }}</span><small>{{ exam.status === 'RESULT_READY' ? '结果已回填' : exam.bill_status === 'PAID' ? '待检查' : '待支付' }}</small></div></div>
+                <div v-if="ordersError" class="workspace-inline-error workspace-inline-error--compact" role="alert"><span>{{ ordersError }}</span><button class="text-button" type="button" @click="loadOrders(emr.registrationId)">重试</button></div>
+                <div v-else-if="ordersLoading" class="order-empty" role="status">正在读取检查医嘱…</div>
+                <div v-else-if="exams.length" class="order-list"><template v-for="exam in exams" :key="exam.id"><button class="order-line" type="button" @click="toggleExam(exam.id)"><span>{{ exam.item_name }}</span><small>{{ exam.status === 'RESULT_READY' ? '结果已回填' : exam.bill_status === 'PAID' ? '待检查' : '待支付' }} · {{ expandedExamId === exam.id ? '收起' : '详情' }}</small></button><div v-if="expandedExamId === exam.id" class="order-detail"><span>状态：{{ exam.status || '—' }}</span><span>费用：¥{{ exam.fee ?? '0.00' }}</span><span>结果：{{ exam.result_text || '尚未回填' }}</span><span>创建时间：{{ exam.create_time || '—' }}</span></div></template></div>
                 <small v-else class="order-empty">本次就诊还没有检查医嘱</small>
               </div>
               <div class="order-card">
                 <div class="order-card-head"><strong>开立处方</strong><small>支付后进入药房队列</small></div>
                 <div class="order-fields"><el-input v-model="rxForm.drugName" :disabled="emr.locked || orderBusy" placeholder="药品名称" /><el-input v-model="rxForm.dosage" :disabled="emr.locked || orderBusy" placeholder="用法用量，如：每次1片" /><el-input v-model="rxForm.frequency" :disabled="emr.locked || orderBusy" placeholder="频次，如：每日2次" /><el-input v-model="rxForm.days" :disabled="emr.locked || orderBusy" type="number" min="1" max="365" placeholder="天数" /><el-input v-model="rxForm.quantity" :disabled="emr.locked || orderBusy" type="number" min="0.01" step="0.01" placeholder="数量" /><el-input v-model="rxForm.unitPrice" :disabled="emr.locked || orderBusy" type="number" min="0" step="0.01" placeholder="单价（元）" /></div>
                 <button class="secondary-button" :disabled="emr.locked || orderBusy" @click="createPrescription">开立处方</button>
-                <div v-if="prescriptions.length" class="order-list"><div v-for="rx in prescriptions" :key="rx.id" class="order-line"><span>处方 #{{ rx.id }}</span><small>{{ rx.bill_status === 'PAID' ? '已支付' : '待支付' }} · ¥{{ rx.total_amount }}</small></div></div>
+                <div v-if="ordersError" class="workspace-inline-error workspace-inline-error--compact" role="alert"><span>{{ ordersError }}</span><button class="text-button" type="button" @click="loadOrders(emr.registrationId)">重试</button></div>
+                <div v-else-if="ordersLoading" class="order-empty" role="status">正在读取处方明细…</div>
+                <div v-else-if="prescriptions.length" class="order-list"><template v-for="rx in prescriptions" :key="rx.id"><button class="order-line" type="button" @click="togglePrescription(rx.id)"><span>处方 #{{ rx.id }}</span><small>{{ rx.bill_status === 'PAID' ? '已支付' : '待支付' }} · ¥{{ rx.total_amount }} · {{ expandedPrescriptionId === rx.id ? '收起' : '详情' }}</small></button><div v-if="expandedPrescriptionId === rx.id" class="order-detail"><span v-for="item in (rx.items || [])" :key="item.id">{{ item.drug_name }} · {{ item.dosage }} · {{ item.frequency }} · {{ item.days }} 天 · {{ item.quantity }} 件</span><span v-if="!rx.items?.length">处方暂未返回药品明细</span></div></template></div>
                 <small v-else class="order-empty">本次就诊还没有处方</small>
               </div>
             </div>
@@ -83,6 +90,11 @@ const activePatient = computed(() => regs.value.find(r => r.registration_id === 
 const pendingCount = computed(() => regs.value.filter(r => r.status !== 'DONE').length)
 const queueFilter = ref('all')
 const busy = ref(false)
+const loading = ref(false)
+const loadError = ref('')
+const detailError = ref('')
+const ordersError = ref('')
+const ordersLoading = ref(false)
 let detailSequence = 0
 const visibleRegs = computed(() => queueFilter.value === 'all' ? regs.value : regs.value.filter(r => queueFilter.value === 'done' ? r.status === 'DONE' : r.status !== 'DONE'))
 const recordSections = ['主诉', '现病史', '既往史', '过敏史', '检查', '诊断', '处理']
@@ -91,20 +103,36 @@ const exams = ref([])
 const prescriptions = ref([])
 const agentTasks = ref([])
 const orderBusy = ref(false)
+const expandedExamId = ref(null)
+const expandedPrescriptionId = ref(null)
 const examForm = reactive({ itemName: '', itemCode: '', fee: '' })
 const rxForm = reactive({ drugName: '', dosage: '', frequency: '', days: '3', quantity: '1', unitPrice: '0' })
 
 onMounted(load)
 async function load() {
+  loading.value = true
+  loadError.value = ''
+  const previousRegistrationId = emr.registrationId
+  ++detailSequence
+  ordersLoading.value = false
+  ordersError.value = ''
+  // 清空旧队列，防止刷新失败时把上一轮权限范围内的数据继续展示。
+  regs.value = []
+  agentTasks.value = []
   try {
     const [registrationRows, taskRows] = await Promise.all([
       api.get('/doctor/registrations'),
       api.get('/doctor/agent-tasks')
     ])
-    regs.value = registrationRows
+    regs.value = registrationRows || []
     agentTasks.value = taskRows || []
+    if (previousRegistrationId && !regs.value.some(row => row.registration_id === previousRegistrationId)) resetActiveEmr()
   } catch (e) {
+    resetActiveEmr()
+    loadError.value = e.response?.data?.msg || e.message || '工作台数据加载失败'
     ElMessage.error(e.response?.data?.msg || e.message || '工作台数据加载失败')
+  } finally {
+    loading.value = false
   }
 }
 function focusTask(task) {
@@ -116,6 +144,10 @@ async function openEmr(row) {
   if (busy.value) return
   const sequence = ++detailSequence
   emr.locked = row.record_status === 'SUBMITTED' || row.status === 'DONE'
+  detailError.value = ''
+  ordersError.value = ''
+  expandedExamId.value = null
+  expandedPrescriptionId.value = null
   emr.id = row.record_id || null; emr.registrationId = row.registration_id
   for (const key of ['chief_complaint', 'present_illness', 'assistant_exam', 'diagnosis', 'treatment']) emr[key] = ''
   emr.past_history = row.past_history || ''; emr.allergy_history = row.allergic_history || ''
@@ -126,19 +158,33 @@ async function openEmr(row) {
       const record = await api.get('/doctor/record', { recordId: row.record_id })
       if (sequence !== detailSequence) return
       for (const key of ['chief_complaint', 'present_illness', 'past_history', 'allergy_history', 'assistant_exam', 'diagnosis', 'treatment']) emr[key] = record[key] || ''
-    } catch { if (sequence === detailSequence) emr.locked = true; ElMessage.error('病历加载失败，请重新选择患者') }
+    } catch (e) { if (sequence === detailSequence) { emr.locked = true; detailError.value = e.response?.data?.msg || e.message || '病历加载失败，请重试' } ElMessage.error('病历加载失败，请重新选择患者') }
   }
   await loadOrders(row.registration_id, sequence)
 }
 async function loadOrders(registrationId, sequence = detailSequence) {
+  if (!registrationId) return
+  ordersLoading.value = true
+  ordersError.value = ''
   try {
     const [examRows, prescriptionRows] = await Promise.all([
       api.get('/doctor/exam-orders', { registrationId }),
       api.get('/doctor/prescriptions', { registrationId })
     ])
-    if (sequence === detailSequence) { exams.value = examRows; prescriptions.value = prescriptionRows }
-  } catch (e) { if (sequence === detailSequence) ElMessage.error(e.response?.data?.msg || e.message || '医嘱加载失败') }
+    if (sequence === detailSequence) { exams.value = examRows || []; prescriptions.value = prescriptionRows || [] }
+  } catch (e) { if (sequence === detailSequence) { exams.value = []; prescriptions.value = []; ordersError.value = e.response?.data?.msg || e.message || '医嘱加载失败'; ElMessage.error(ordersError.value) } }
+  finally { if (sequence === detailSequence) ordersLoading.value = false }
 }
+function resetActiveEmr() {
+  ++detailSequence
+  emr.locked = false; emr.id = null; emr.registrationId = null
+  for (const key of ['chief_complaint', 'present_illness', 'past_history', 'allergy_history', 'assistant_exam', 'diagnosis', 'treatment']) emr[key] = ''
+  exams.value = []; prescriptions.value = []; detailError.value = ''; ordersError.value = ''
+  expandedExamId.value = null; expandedPrescriptionId.value = null
+}
+function retryActive() { const row = activePatient.value; if (row) openEmr(row) }
+function toggleExam(id) { expandedExamId.value = expandedExamId.value === id ? null : id }
+function togglePrescription(id) { expandedPrescriptionId.value = expandedPrescriptionId.value === id ? null : id }
 function resetOrderForms() {
   Object.assign(examForm, { itemName: '', itemCode: '', fee: '' })
   Object.assign(rxForm, { drugName: '', dosage: '', frequency: '', days: '3', quantity: '1', unitPrice: '0' })

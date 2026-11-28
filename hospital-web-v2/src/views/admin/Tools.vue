@@ -1,6 +1,7 @@
 <template>
   <section class="workspace registry-workspace" aria-label="工具注册表工作区">
     <section class="page-intro"><div><span class="eyebrow">MCP TOOL REGISTRY</span><h2>Agent 能力注册中心</h2><p>每个已启用工具都会进入模型的实时能力清单。先验证，再开放给决策链。</p></div><button class="primary-button" @click="openReg(null)">＋ 注册新工具</button></section>
+    <div v-if="loading" class="surface module-state" role="status">正在同步工具注册表…</div><div v-else-if="loadError" class="surface module-state module-state--error" role="alert"><span>{{ loadError }}</span><button class="text-button" type="button" @click="load">重新加载</button></div>
     <section class="registry-summary"><div><strong>{{ tools.length }}</strong><span>已注册工具</span></div><div><strong>{{ tools.filter(t => t.enabled).length }}</strong><span>当前启用</span></div><div><strong>{{ tools.filter(t => !t.enabled).length }}</strong><span>待校验 / 停用</span></div><p><i></i>运行时工具池已同步</p></section>
     <section class="tool-grid">
       <article v-for="(t, i) in tools" :key="t.id" :class="['tool-card', { disabled: !t.enabled }]">
@@ -46,6 +47,8 @@ import { ElMessage } from 'element-plus'
 import { api } from '../../api'
 
 const tools = ref([])
+const loading = ref(false)
+const loadError = ref('')
 const dialog = ref(false)
 const regDlg = ref(false)
 const cur = ref(null)
@@ -53,11 +56,10 @@ const args = ref('{}')
 const result = ref('')
 const reg = reactive({ id: null, tool_code: '', name: '', description: '', param_schema: '[]', enabled: 1, sort: 70 })
 
-async function load() { tools.value = await api.get('/admin/tools') }
+async function load() { loading.value = true; loadError.value = ''; tools.value = []; try { tools.value = await api.get('/admin/tools') || [] } catch (e) { loadError.value = e.response?.data?.msg || e.message || '工具注册表加载失败'; ElMessage.error(loadError.value) } finally { loading.value = false } }
 async function toggle(t) {
-  await api.post('/admin/tools/toggle', { id: t.id })
-  ElMessage.success(`${t.tool_code} 已${t.enabled ? '停用' : '启用'}`)
-  load()
+  try { await api.post('/admin/tools/toggle', { id: t.id }); ElMessage.success(`${t.tool_code} 已${t.enabled ? '停用' : '启用'}`); await load() }
+  catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '工具状态更新失败') }
 }
 function openTest(t) { cur.value = t; args.value = '{}'; result.value = ''; dialog.value = true }
 async function runTest() {
@@ -75,13 +77,12 @@ function openReg(t) {
   regDlg.value = true
 }
 async function saveReg() {
-  await api.post('/admin/tools/save', null, { ...reg })
-  ElMessage.success('工具已保存——下一次 Agent 运行即按最新工具池执行')
-  regDlg.value = false; load()
+  try { await api.post('/admin/tools/save', null, { ...reg }); ElMessage.success('工具已保存——下一次 Agent 运行即按最新工具池执行'); regDlg.value = false; await load() }
+  catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '工具保存失败') }
 }
 async function del(t) {
-  await api.post('/admin/tools/delete', { id: t.id })
-  ElMessage.success('已删除'); load()
+  try { await api.post('/admin/tools/delete', { id: t.id }); ElMessage.success('已删除'); await load() }
+  catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '工具删除失败') }
 }
 onMounted(load)
 </script>

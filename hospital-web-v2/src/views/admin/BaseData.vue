@@ -1,6 +1,13 @@
 <template>
   <section class="workspace data-workspace" aria-label="基础数据工作区">
     <section class="page-intro"><div><span class="eyebrow">HOSPITAL MASTER DATA</span><h2>医院资源数据台</h2><p>统一维护科室、医生、排班、患者档案与分诊规则，所有变化直接进入实时业务链路。</p></div></section>
+    <section v-if="loading || loadError" class="module-state" aria-live="polite">
+      <span v-if="loading">正在同步医院基础数据…</span>
+      <template v-else>
+        <span class="empty-state--error">{{ loadError }}</span>
+        <el-button size="small" @click="loadAll">重试</el-button>
+      </template>
+    </section>
     <section class="data-summary"><button :class="{ active: tab === 'dept' }" @click="tab='dept'"><strong>{{ depts.length }}</strong><span>科室</span></button><button :class="{ active: tab === 'doctor' }" @click="tab='doctor'"><strong>{{ doctors.length }}</strong><span>医生</span></button><button :class="{ active: tab === 'sched' }" @click="tab='sched'"><strong>{{ schedules.length }}</strong><span>排班号源</span></button><button :class="{ active: tab === 'patient' }" @click="tab='patient'"><strong>{{ patients.length }}</strong><span>患者档案</span></button><button :class="{ active: tab === 'tag' }" @click="tab='tag'"><strong>{{ tags.length }}</strong><span>症状标签</span></button><button :class="{ active: tab === 'flag' }" @click="tab='flag'"><strong>{{ flags.length }}</strong><span>危急规则</span></button></section>
     <section class="surface data-table-stage">
     <el-tabs v-model="tab" class="data-tabs">
@@ -196,6 +203,8 @@ import { api } from '../../api'
 
 const tab = ref('dept')
 const depts = ref([]), doctors = ref([]), schedules = ref([]), patients = ref([]), tags = ref([]), flags = ref([])
+const loading = ref(false)
+const loadError = ref('')
 const dlg = reactive({ visible: false, type: '', title: '' })
 const form = reactive({})
 const pp = reactive({ visible: false, doctorId: null, fromDate: '', days: 7 })
@@ -204,11 +213,20 @@ const deptName = id => (depts.value.find(d => d.id === id) || {}).name || id
 const doctorName = id => (doctors.value.find(d => d.id === id) || {}).name || id
 
 async function loadAll() {
-  const [a, b, c, d, e, f] = await Promise.all([
-    api.get('/admin/departments'), api.get('/admin/doctors'), api.get('/admin/schedules'),
-    api.get('/admin/patients'), api.get('/admin/symptom-tags'), api.get('/admin/red-flags')
-  ])
-  depts.value = a; doctors.value = b; schedules.value = c; patients.value = d; tags.value = e; flags.value = f
+  loading.value = true
+  loadError.value = ''
+  depts.value = []; doctors.value = []; schedules.value = []; patients.value = []; tags.value = []; flags.value = []
+  try {
+    const [a, b, c, d, e, f] = await Promise.all([
+      api.get('/admin/departments'), api.get('/admin/doctors'), api.get('/admin/schedules'),
+      api.get('/admin/patients'), api.get('/admin/symptom-tags'), api.get('/admin/red-flags')
+    ])
+    depts.value = a; doctors.value = b; schedules.value = c; patients.value = d; tags.value = e; flags.value = f
+  } catch (err) {
+    loadError.value = err?.message || '基础数据加载失败，请重试。'
+  } finally {
+    loading.value = false
+  }
 }
 onMounted(loadAll)
 
@@ -227,14 +245,22 @@ function open(type, row) {
   Object.assign(form, row ? { ...row } : blank)
 }
 async function save() {
-  const url = { dept: '/admin/departments/save', doctor: '/admin/doctors/save', sched: '/admin/schedules/save',
-    patient: '/admin/patients/save', tag: '/admin/symptom-tags/save', flag: '/admin/red-flags/save' }[dlg.type]
-  await api.post(url, null, form)
-  ElMessage.success('已保存'); dlg.visible = false; loadAll()
+  try {
+    const url = { dept: '/admin/departments/save', doctor: '/admin/doctors/save', sched: '/admin/schedules/save',
+      patient: '/admin/patients/save', tag: '/admin/symptom-tags/save', flag: '/admin/red-flags/save' }[dlg.type]
+    await api.post(url, null, form)
+    ElMessage.success('已保存'); dlg.visible = false; await loadAll()
+  } catch (err) {
+    ElMessage.error(err?.message || '保存失败，请稍后重试')
+  }
 }
 async function delSchedule(row) {
-  await api.post('/admin/schedules/delete?1=1', { id: row.id })
-  ElMessage.success('已删除'); loadAll()
+  try {
+    await api.post('/admin/schedules/delete?1=1', { id: row.id })
+    ElMessage.success('已删除'); await loadAll()
+  } catch (err) {
+    ElMessage.error(err?.message || '删除失败，请稍后重试')
+  }
 }
 function openPostpone() {
   pp.doctorId = doctors.value[0]?.id || null
@@ -242,9 +268,13 @@ function openPostpone() {
   pp.visible = true
 }
 async function postpone() {
-  const r = await api.post('/admin/schedules/postpone',
-    { doctorId: pp.doctorId, fromDate: pp.fromDate, days: pp.days })
-  ElMessage.success('顺延完成，新增 ' + r.created + ' 个班次')
-  pp.visible = false; loadAll()
+  try {
+    const r = await api.post('/admin/schedules/postpone',
+      { doctorId: pp.doctorId, fromDate: pp.fromDate, days: pp.days })
+    ElMessage.success('顺延完成，新增 ' + r.created + ' 个班次')
+    pp.visible = false; await loadAll()
+  } catch (err) {
+    ElMessage.error(err?.message || '排班顺延失败，请稍后重试')
+  }
 }
 </script>

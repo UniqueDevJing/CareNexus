@@ -4,6 +4,7 @@
       <div><span class="eyebrow">运营中心 / 实时状态</span><h2>今天的就诊链路，哪里需要你介入？</h2><p>优先处理低证据、危急征象和号源异常；其余流程保持自动运行并留下可审计记录。</p></div>
       <div class="work-header-actions"><span class="ops-health"><i></i><strong>系统运行中</strong><small>{{ ov.doctorOnline || 0 }} 位医生在线</small></span><button class="secondary-button" @click="load">刷新数据</button></div>
     </section>
+    <div v-if="loading" class="surface module-state" role="status">正在同步运营数据…</div><div v-else-if="loadError" class="surface module-state module-state--error" role="alert"><span>{{ loadError }}</span><button class="text-button" type="button" @click="load">重新加载</button></div>
 
     <section class="metric-grid metric-grid--four" aria-label="运营核心指标">
       <article class="metric-tile"><span>累计分诊建议</span><strong>{{ ov.totalSuggestion || 0 }}</strong><small>Agent 平均 {{ ov.avgAgentLatencyMs || 0 }}ms</small></article>
@@ -100,32 +101,28 @@ const selected = ref(null)
 const timeline = ref([])
 const toolLogs = ref([])
 const reviewNotes = reactive({})
+const loading = ref(false)
+const loadError = ref('')
 
 function short(s) { if (!s) return '—'; return s.length > 60 ? s.slice(0, 60) + '…' : s }
 function capacity(d) { return d.slots ? Math.min(Math.round((d.used / d.slots) * 100), 100) : 0 }
 function statusLabel(status) { return status === 'NEED_MORE_INFO' ? '等待患者补充' : status === 'PENDING' ? '待临床复核' : status || '待处理' }
 async function load() {
-  ov.value = await api.get('/admin/dashboard/overview')
-  byDept.value = await api.get('/admin/dashboard/by-department')
-  runs.value = await api.get('/admin/dashboard/runs')
-  enh.value = await api.get('/admin/dashboard/enhanced')
-  manualReviews.value = await api.get('/admin/dashboard/manual-review')
+  loading.value = true; loadError.value = ''; byDept.value = []; runs.value = []; enh.value = {}; manualReviews.value = []; selected.value = null; timeline.value = []; toolLogs.value = []
+  try { ov.value = await api.get('/admin/dashboard/overview') || {}; byDept.value = await api.get('/admin/dashboard/by-department') || []; runs.value = await api.get('/admin/dashboard/runs') || []; enh.value = await api.get('/admin/dashboard/enhanced') || {}; manualReviews.value = await api.get('/admin/dashboard/manual-review') || [] }
+  catch (e) { loadError.value = e.response?.data?.msg || e.message || '运营数据加载失败' }
+  finally { loading.value = false }
 }
 async function resolveReview(item, action) {
   const note = reviewNotes[item.suggestion_id]?.trim()
   if (!note) return
-  await api.post('/admin/triage/manual-review', null, {
-    suggestionId: item.suggestion_id,
-    action,
-    note
-  })
-  delete reviewNotes[item.suggestion_id]
-  await load()
+  try { await api.post('/admin/triage/manual-review', null, { suggestionId: item.suggestion_id, action, note }); delete reviewNotes[item.suggestion_id]; await load() }
+  catch (e) { loadError.value = e.response?.data?.msg || e.message || '人工复核处理失败' }
 }
 async function selectRun(runId) {
   selected.value = runId
-  timeline.value = await api.get('/admin/dashboard/timeline', { runId })
-  toolLogs.value = await api.get('/admin/dashboard/tool-logs', { runId })
+  try { timeline.value = await api.get('/admin/dashboard/timeline', { runId }) || []; toolLogs.value = await api.get('/admin/dashboard/tool-logs', { runId }) || [] }
+  catch (e) { timeline.value = []; toolLogs.value = []; loadError.value = e.response?.data?.msg || e.message || '执行详情加载失败' }
 }
 onMounted(load)
 </script>

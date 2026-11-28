@@ -1,6 +1,13 @@
 <template>
   <section class="workspace symptom-workspace" aria-label="症状标签库工作区">
     <section class="page-intro"><div><span class="eyebrow">TRIAGE ONTOLOGY</span><h2>症状与安全规则图谱</h2><p>从患者表达，到科室路由，再到危急硬拦截：在一张三层规则图谱中维护分诊行为。</p></div></section>
+    <section v-if="loading || loadError" class="module-state" aria-live="polite">
+      <span v-if="loading">正在同步症状与安全规则…</span>
+      <template v-else>
+        <span class="empty-state--error">{{ loadError }}</span>
+        <el-button size="small" @click="load">重试</el-button>
+      </template>
+    </section>
     <section class="rule-flow"><div><span>01</span><b>症状标签</b><small>{{ tags.length }} 个语义锚点</small></div><i>→</i><div><span>02</span><b>科室映射</b><small>{{ maps.length }} 条路由规则</small></div><i>→</i><div class="critical"><span>03</span><b>危急拦截</b><small>{{ flags.length }} 条安全规则</small></div></section>
     <section class="surface symptom-stage">
       <div class="sym-grid">
@@ -139,6 +146,8 @@ const depts = ref([])
 const tags = ref([])
 const maps = ref([])
 const flags = ref([])
+const loading = ref(false)
+const loadError = ref('')
 
 const tagDlg = ref(false)
 const mapDlg = ref(false)
@@ -156,13 +165,22 @@ function isCritical(name) {
 }
 
 async function load() {
-  const [d, t, m, f] = await Promise.all([
-    api.get('/admin/departments'),
-    api.get('/admin/symptom-tags'),
-    api.get('/admin/symptom-maps'),
-    api.get('/admin/red-flags')
-  ])
-  depts.value = d; tags.value = t; maps.value = m; flags.value = f
+  loading.value = true
+  loadError.value = ''
+  depts.value = []; tags.value = []; maps.value = []; flags.value = []
+  try {
+    const [d, t, m, f] = await Promise.all([
+      api.get('/admin/departments'),
+      api.get('/admin/symptom-tags'),
+      api.get('/admin/symptom-maps'),
+      api.get('/admin/red-flags')
+    ])
+    depts.value = d; tags.value = t; maps.value = m; flags.value = f
+  } catch (err) {
+    loadError.value = err?.message || '症状规则加载失败，请重试。'
+  } finally {
+    loading.value = false
+  }
 }
 
 function openTag(row) {
@@ -171,8 +189,12 @@ function openTag(row) {
 }
 async function saveTag() {
   if (!tagForm.name) { ElMessage.warning('请填标签名'); return }
-  await api.post('/admin/symptom-tags/save', null, { ...tagForm })
-  ElMessage.success('已保存'); tagDlg.value = false; load()
+  try {
+    await api.post('/admin/symptom-tags/save', null, { ...tagForm })
+    ElMessage.success('已保存'); tagDlg.value = false; await load()
+  } catch (err) {
+    ElMessage.error(err?.message || '保存失败，请稍后重试')
+  }
 }
 
 function openMap(row) {
@@ -181,8 +203,12 @@ function openMap(row) {
 }
 async function saveMap() {
   if (!mapForm.symptom_keyword || !mapForm.department_id) { ElMessage.warning('请填关键词与科室'); return }
-  await api.post('/admin/symptom-maps/save', null, { ...mapForm })
-  ElMessage.success('已保存'); mapDlg.value = false; load()
+  try {
+    await api.post('/admin/symptom-maps/save', null, { ...mapForm })
+    ElMessage.success('已保存'); mapDlg.value = false; await load()
+  } catch (err) {
+    ElMessage.error(err?.message || '保存失败，请稍后重试')
+  }
 }
 
 function openFlag(row) {
@@ -191,14 +217,22 @@ function openFlag(row) {
 }
 async function saveFlag() {
   if (!flagForm.name || !flagForm.keywords) { ElMessage.warning('请填征象名与命中关键词'); return }
-  await api.post('/admin/red-flags/save', null, { ...flagForm })
-  ElMessage.success('已保存'); flagDlg.value = false; load()
+  try {
+    await api.post('/admin/red-flags/save', null, { ...flagForm })
+    ElMessage.success('已保存'); flagDlg.value = false; await load()
+  } catch (err) {
+    ElMessage.error(err?.message || '保存失败，请稍后重试')
+  }
 }
 
 async function del(url, id, label) {
   await ElMessageBox.confirm(`确认删除该${label}？删除立即生效并影响分诊行为。`, '删除确认', { type: 'warning' })
-  await api.post(url, { id })
-  ElMessage.success('已删除'); load()
+  try {
+    await api.post(url, { id })
+    ElMessage.success('已删除'); await load()
+  } catch (err) {
+    ElMessage.error(err?.message || '删除失败，请稍后重试')
+  }
 }
 
 onMounted(load)

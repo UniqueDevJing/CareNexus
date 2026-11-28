@@ -1,6 +1,7 @@
 <template>
   <section class="workspace model-workspace" aria-label="AI 模型配置工作区">
     <section class="page-intro"><div><span class="eyebrow">MODEL RUNTIME</span><h2>AI 模型与提示词</h2><p>将对话模型和向量模型作为可切换的运行时资源管理，配置保存后立即生效。</p></div><button class="primary-button" @click="openNew">＋ 新增模型配置</button></section>
+    <div v-if="loading" class="surface module-state" role="status">正在同步模型配置…</div><div v-else-if="loadError" class="surface module-state module-state--error" role="alert"><span>{{ loadError }}</span><button class="text-button" type="button" @click="load">重新加载</button></div>
     <section class="model-stage">
       <article v-for="m in models" :key="m.id" :class="['model-card', { disabled: !m.enabled }]">
         <header><span class="provider-mark">{{ (m.provider || 'AI').slice(0, 2).toUpperCase() }}</span><span :class="['tool-state', m.enabled ? 'on' : 'off']"><i></i>{{ m.enabled ? '运行中' : '未启用' }}</span></header>
@@ -57,12 +58,14 @@ import { ElMessage } from 'element-plus'
 import { api } from '../../api'
 
 const models = ref([])
+const loading = ref(false)
+const loadError = ref('')
 const dlg = ref(false)
 const form = reactive({})
 const testDlg = ref(false)
 const testing = reactive({ model: '', ok: false, ms: 0, reply: '' })
 
-async function load() { models.value = await api.get('/admin/ai-models') }
+async function load() { loading.value = true; loadError.value = ''; models.value = []; try { models.value = await api.get('/admin/ai-models') || [] } catch (e) { loadError.value = e.response?.data?.msg || e.message || '模型配置加载失败'; ElMessage.error(loadError.value) } finally { loading.value = false } }
 onMounted(load)
 
 function openNew() {
@@ -77,13 +80,12 @@ function openEdit(row) {
   dlg.value = true
 }
 async function save() {
-  await api.post('/admin/ai-models/save', null, form)
-  ElMessage.success('已保存'); dlg.value = false; load()
+  try { await api.post('/admin/ai-models/save', null, form); ElMessage.success('已保存'); dlg.value = false; await load() }
+  catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '模型配置保存失败') }
 }
 async function test(row) {
   testing.model = row.model; testing.ok = false; testing.ms = 0; testing.reply = '测试中...'; testDlg.value = true
-  const r = await api.post('/admin/ai-models/test', null,
-    { base_url: row.base_url, model: row.model, purpose: row.purpose })
-  testing.ok = r.ok; testing.ms = r.ms; testing.reply = r.reply
+  try { const r = await api.post('/admin/ai-models/test', null, { base_url: row.base_url, model: row.model, purpose: row.purpose }); testing.ok = r.ok; testing.ms = r.ms; testing.reply = r.reply }
+  catch (e) { testing.reply = e.response?.data?.msg || e.message || '连接测试失败' }
 }
 </script>

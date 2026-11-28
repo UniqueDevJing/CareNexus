@@ -98,7 +98,7 @@ async function submit() {
     const { token: _token, ...safeUser } = user
     localStorage.setItem('hospital_user', JSON.stringify(safeUser))
     ElMessage.success(mode.value === 'login' ? '已进入工作台' : '患者档案已建立')
-    router.replace(user.role === 'admin' ? '/admin/dashboard' : user.role === 'doctor' ? '/doctor/console' : '/patient/pre')
+    router.replace(user.role === 'admin' ? '/admin/dashboard' : user.role === 'doctor' ? '/doctor/console' : user.role === 'nurse' ? '/nurse/triage' : '/patient/pre')
   } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '操作失败，请检查账号信息') }
   finally { loading.value = false }
 }

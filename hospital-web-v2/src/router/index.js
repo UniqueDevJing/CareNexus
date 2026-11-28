@@ -14,6 +14,7 @@ const MyBills = () => import('../views/patient/MyBills.vue')
 const MyExams = () => import('../views/patient/MyExams.vue')
 const MyPrescriptions = () => import('../views/patient/MyPrescriptions.vue')
 const DoctorConsole = () => import('../views/doctor/DoctorConsole.vue')
+const NurseConsole = () => import('../views/nurse/NurseConsole.vue')
 const Login = () => import('../views/Login.vue')
 
 const routes = [
@@ -33,12 +34,12 @@ const routes = [
   { path: '/admin/tools/logs', name: 'toolLogs', component: AdminModule, props: { mode: 'toolLogs' }, meta: { group: 'admin', title: '工具调用日志', tag: 'LOG' } },
   { path: '/admin/agent-runs', name: 'agentRuns', component: AdminModule, props: { mode: 'agentRuns' }, meta: { group: 'admin', title: 'Agent执行时间线', tag: 'TRACE' } },
   { path: '/doctor/console', name: 'doctorConsole', component: DoctorConsole, meta: { group: 'doctor', title: '门诊接诊台', tag: 'EMR' } },
+  { path: '/nurse/triage', name: 'nurseTriage', component: NurseConsole, meta: { group: 'nurse', title: '临床接管台', tag: 'REVIEW' } },
   { path: '/patient/pre', name: 'pre', component: PreTriage, meta: { group: 'patient', title: '智能预问诊', tag: 'SSE' } },
   { path: '/patient/records', name: 'records', component: Records, meta: { group: 'patient', title: '我的就诊', tag: 'EMR' } },
   { path: '/patient/bills', name: 'bills', component: MyBills, meta: { group: 'patient', title: '我的账单', tag: 'PAY' } },
   { path: '/patient/exams', name: 'exams', component: MyExams, meta: { group: 'patient', title: '我的检查', tag: 'EXAM' } },
   { path: '/patient/prescriptions', name: 'prescriptions', component: MyPrescriptions, meta: { group: 'patient', title: '我的处方', tag: 'RX' } },
-  // 临床复核已合并进医生工作台；旧 nurse API 仍保留用于兼容存量客户端。
 ]
 
 const router = createRouter({
@@ -55,7 +56,7 @@ router.beforeEach(to => {
   if (!user) return '/login'
   const group = to.meta.group
   if (group && group !== user.role && user.role !== 'admin') {
-    return user.role === 'doctor' ? '/doctor/console' : '/patient/pre'
+    return user.role === 'doctor' ? '/doctor/console' : user.role === 'nurse' ? '/nurse/triage' : '/patient/pre'
   }
   return true
 })
