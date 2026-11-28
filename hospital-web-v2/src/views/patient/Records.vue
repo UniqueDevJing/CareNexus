@@ -333,7 +333,7 @@ onMounted(load)
 .records-state span { font-size: 12px; }
 .records-state-mark, .detail-placeholder-mark { display: grid; width: 44px; height: 44px; margin-bottom: 5px; place-items: center; color: var(--teal-dark); border: 1px solid var(--sage-strong); border-radius: 50%; background: var(--sage); font-size: 26px; }
 .records-state--error strong { color: var(--rust); }
-.record-detail { position: sticky; top: 112px; min-height: 620px; }
+.record-detail { position: sticky; top: 112px; min-height: 620px; scroll-margin-top: 104px; }
 .detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
 .detail-header h3 { max-width: 350px; margin: 7px 0 0; color: var(--ink); font: 500 24px/1.25 var(--display); letter-spacing: -.035em; }
 .detail-meta { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 14px 0 17px; color: var(--ink-soft); font-size: 11px; }
