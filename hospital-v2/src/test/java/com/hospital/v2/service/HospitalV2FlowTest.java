@@ -108,6 +108,16 @@ class HospitalV2FlowTest {
     }
 
     @Test
+    void natural_duration_expression_is_not_asked_again() {
+        long sid = preTriage.startSession(1L);
+        String reply = preTriage.generateReply(sid, "三个月以来长期晚上睡不着");
+
+        assertFalse(reply.contains("从什么时候开始"), "已表达“三个月以来/长期”时不能重复追问时长");
+        assertTrue(reply.contains("发热") && reply.contains("呼吸困难"),
+                "时长已识别后应进入安全伴随症状确认，而不是答非所问");
+    }
+
+    @Test
     void normal_triage_returns_valid_department() {
         long sid = preTriage.startSession(1L);
         TriageResult r = agent.triage(sid, 1L, "咳嗽一周，夜间加重");

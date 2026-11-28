@@ -19,8 +19,11 @@ import java.util.regex.Pattern;
  */
 @Service
 public class PreTriageService {
-    // 患者常用中文数字描述时长（如“三天”“两周”），不能只识别阿拉伯数字。
-    private static final Pattern DURATION = Pattern.compile("((?:\\d+|[一二两三四五六七八九十百千万几数]+)\\s*(小时|天|周|月|年)|今天|昨天|刚刚|持续|反复|多年)");
+    // 患者常用“几个月/三个月以来/长期”等自然表达描述时长，不能只识别“3个月”。
+    // 该门槛只判断事实是否已被表达，不替代模型做医疗判断。
+    private static final Pattern DURATION = Pattern.compile(
+            "((?:\\d+|[一二两三四五六七八九十百千万几数]+)\\s*(?:个\\s*)?(小时|天|周|月|年)"
+                    + "|今天|昨天|刚刚|持续|反复|多年|长期|很久|最近|一阵子|数月|数周|数天)");
     private static final Pattern SAFETY_CONTEXT = Pattern.compile("(没有|无|否|伴随|发热|咳痰|胸闷|胸痛|呼吸|喘|头晕|意识|出血|呕吐|腹泻|过敏|加重|严重)");
     private static final Pattern VISIT_GOAL = Pattern.compile("(预约|挂号|就诊|看病|门诊|医生|建议|咨询|检查)");
     private static final String COMPLETION_MARKER = "信息已齐全，正在为您匹配就诊安排…";
